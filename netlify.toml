@@ -1,0 +1,31 @@
+# Netlify configuration — https://docs.netlify.com/configure-builds/file-based-configuration/
+#
+# Formatify is a fully static single-page app: JSON / Parquet / Avro are all
+# parsed client-side, so no Netlify Functions are required.
+
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+# Vite 7 requires Node ^20.19.0 || >=22.12.0 — pin a version that satisfies it.
+[build.environment]
+  NODE_VERSION = "22"
+
+# SPA fallback: serve index.html for unknown paths so deep links / refreshes work.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Vite emits content-hashed filenames under /assets/ — safe to cache forever.
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "DENY"
+    Referrer-Policy = "strict-origin-when-cross-origin"
