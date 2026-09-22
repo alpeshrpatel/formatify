@@ -1,5 +1,5 @@
 /* ==========================================================================
-   Formatify — a JSON beautifier / validator
+   Formatify — The Privacy-First Developer Toolkit for JSON, Parquet, Avro, CSV, YAML
    Layout: topbar, toolbar, two panels (input editor + output), toast.
    ========================================================================== */
 
@@ -150,12 +150,18 @@ button {
   padding: 16px clamp(12px, 2vw, 24px) 18px;
 }
 
+/* Unified glass header: brand · format tabs · actions */
 .topbar {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
   gap: 16px;
-  flex-wrap: wrap;
+  padding: 10px 14px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  backdrop-filter: blur(14px);
+  box-shadow: var(--shadow);
 }
 
 .brand {
@@ -169,10 +175,19 @@ button {
   place-items: center;
   width: 38px;
   height: 38px;
+  padding: 0;
+  border: 0;
   border-radius: 12px;
   color: #fff;
   background: linear-gradient(135deg, var(--accent), var(--accent-2));
   box-shadow: 0 10px 24px -12px var(--accent);
+  cursor: pointer;
+  transition: transform 0.16s ease, box-shadow 0.16s ease;
+}
+
+.brand-mark:hover {
+  transform: translateY(-1px) rotate(-6deg);
+  box-shadow: 0 14px 28px -12px var(--accent);
 }
 
 .brand-text h1 {
@@ -1140,6 +1155,35 @@ button {
     padding: 12px 10px 14px;
   }
 
+  /* Header wraps to two rows: brand + actions, then the tab track. */
+  .topbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 10px 12px;
+  }
+
+  .brand {
+    order: 1;
+    min-width: 0;
+  }
+
+  .topbar-right {
+    order: 2;
+    margin-left: auto;
+  }
+
+  .format-switcher {
+    order: 3;
+    flex: 1 0 100%;
+    justify-content: center;
+  }
+
+  .format-tab::after,
+  .btn kbd {
+    display: none;
+  }
+
   .toolbar-spacer {
     display: none;
   }
@@ -1175,48 +1219,216 @@ button {
    Format switcher (App) + multi-format workspaces (src/formats/*)
    ========================================================================== */
 
+/* Centre the segmented tab track between brand and actions */
 .format-switcher {
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: center;
+  gap: 12px;
   flex-wrap: wrap;
+  min-width: 0;
+}
+
+/* Rounded track that visually groups the three format tabs */
+.tab-track {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
 }
 
 .format-tab {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  padding: 7px 14px;
+  padding: 7px 15px;
   border-radius: 999px;
-  border: 1px solid var(--border);
-  background: var(--panel-2);
+  border: 1px solid transparent;
+  background: transparent;
   color: var(--muted);
   cursor: pointer;
   font-weight: 550;
   font-size: 13px;
-  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  transition: color 0.15s, background 0.15s, box-shadow 0.15s, transform 0.15s;
 }
 
 .format-tab:hover {
   color: var(--text);
-  border-color: var(--border-strong);
+  background: color-mix(in srgb, var(--text) 7%, transparent);
+  transform: translateY(-1px);
 }
 
 .format-tab.is-active {
   color: #fff;
-  border-color: transparent;
   background: linear-gradient(120deg, var(--accent), var(--accent-2));
   box-shadow: 0 8px 20px -10px var(--accent);
+  transform: none;
 }
 
 [data-theme='light'] .format-tab.is-active {
   color: #fff;
 }
 
+/* Per-format identity dot (colour comes from FORMAT.hue) */
+.tab-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px color-mix(in srgb, currentColor 18%, transparent);
+}
+
+/* Shortcut digit (1/2/3) painted via CSS so accessible text stays clean */
+.format-tab::after {
+  content: attr(data-key);
+  padding: 1px 5px;
+  border-radius: 6px;
+  background: color-mix(in srgb, currentColor 14%, transparent);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.35;
+  opacity: 0.8;
+}
+
+.format-tab.is-active::after {
+  background: rgba(255, 255, 255, 0.22);
+  opacity: 1;
+}
+
+.format-tab:focus-visible,
+.icon-btn:focus-visible,
+.btn:focus-visible,
+.brand-mark:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .format-switcher-hint {
   color: var(--faint);
   font-size: 12.5px;
   margin-left: 4px;
+}
+
+/* ---------------------------- shortcuts help ---------------------------- */
+
+kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  padding: 2px 6px;
+  border: 1px solid var(--border-strong);
+  border-bottom-width: 2px;
+  border-radius: 6px;
+  background: var(--panel-2);
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1.4;
+}
+
+.hint-kbd {
+  margin-left: 2px;
+  padding: 1px 5px;
+  min-width: 0;
+  font-size: 10px;
+}
+
+.shortcuts-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(2, 6, 23, 0.55);
+  backdrop-filter: blur(6px);
+  animation: shortcuts-in 0.16s ease;
+}
+
+[data-theme='light'] .shortcuts-backdrop {
+  background: rgba(15, 23, 42, 0.32);
+}
+
+.shortcuts-card {
+  width: min(560px, 100%);
+  max-height: min(80vh, 640px);
+  overflow: auto;
+  background: var(--panel-solid);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 18px 20px;
+}
+
+.shortcuts-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.shortcuts-head h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+}
+
+.shortcuts-group + .shortcuts-group {
+  margin-top: 16px;
+}
+
+.shortcuts-group h3 {
+  margin-bottom: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--faint);
+}
+
+.shortcut-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 7px 0;
+  font-size: 13px;
+  border-bottom: 1px dashed var(--border);
+}
+
+.shortcut-row:last-child {
+  border-bottom: 0;
+}
+
+.shortcut-row .keys {
+  display: inline-flex;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.shortcuts-foot {
+  margin-top: 16px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--faint);
+}
+
+@keyframes shortcuts-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 /* ----------------------------- shared panels ----------------------------- */

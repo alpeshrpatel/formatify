@@ -66,6 +66,7 @@ async function renderApp() {
 describe('App — format switching', () => {
   beforeEach(() => {
     window.localStorage.clear();
+    window.history.replaceState(null, '', window.location.pathname); // reset tab deep link
     document.documentElement.dataset.theme = 'dark';
   });
 
@@ -124,6 +125,7 @@ describe('App — format switching', () => {
 describe('App — file routing', () => {
   beforeEach(() => {
     window.localStorage.clear();
+    window.history.replaceState(null, '', window.location.pathname); // reset tab deep link
   });
 
   test('detectFormat routes JSON, Parquet and Avro by magic bytes', () => {

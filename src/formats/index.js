@@ -24,6 +24,7 @@ export const FORMATS = [
     label: 'JSON',
     description: 'Beautify, validate and repair JSON text.',
     icon: 'braces',
+    hue: '#818cf8', // tab dot colour — identity at a glance
     accept: '.json,.jsonl,.ndjson,.txt,application/json,text/plain',
     extensions: ['.json', '.jsonl', '.ndjson', '.txt'],
     detect: (bytes) => detectJson(bytes),
@@ -34,6 +35,7 @@ export const FORMATS = [
     label: 'Parquet',
     description: 'Inspect schemas and preview rows of .parquet files.',
     icon: 'table',
+    hue: '#22d3ee',
     accept: '.parquet,application/octet-stream',
     extensions: ['.parquet', '.pq', '.pqt'],
     detect: (bytes) => detectParquet(bytes),
@@ -44,6 +46,7 @@ export const FORMATS = [
     label: 'Avro',
     description: 'Inspect schemas and preview rows of .avro container files.',
     icon: 'boxes',
+    hue: '#fbbf24',
     accept: '.avro,application/octet-stream',
     extensions: ['.avro'],
     detect: (bytes) => detectAvro(bytes),

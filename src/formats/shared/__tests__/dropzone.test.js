@@ -146,6 +146,7 @@ function buildParquet() {
 describe('DropZone — dropping files inside the binary panels', () => {
   beforeEach(() => {
     window.localStorage.clear();
+    window.history.replaceState(null, '', window.location.pathname); // reset tab deep link
   });
 
   test('Avro: a dropped container loads rows and shows no error', async () => {
@@ -217,6 +218,7 @@ describe('DropZone — dropping files inside the binary panels', () => {
 describe('App — dropping a file anywhere on the page', () => {
   beforeEach(() => {
     window.localStorage.clear();
+    window.history.replaceState(null, '', window.location.pathname); // reset tab deep link
   });
 
   test('a .parquet drop outside any zone routes to the Parquet reader', async () => {

@@ -1,6 +1,7 @@
 import { Suspense, lazy, useCallback, useEffect, useState } from 'react';
 
 import Icon from './components/Icon.jsx';
+import ShortcutsHelp from './components/ShortcutsHelp.jsx';
 import Toast from './components/Toast.jsx';
 import { FORMATS, detectFormat, getFormat } from './formats/index.js';
 import { readFileBytes } from './formats/shared/binaryUtils.js';
@@ -25,19 +26,28 @@ function readSession() {
 }
 
 /**
+ * Tab selection order: URL deep link (`#parquet`) › saved session › JSON.
+ * Deep links make every workspace shareable and refresh-safe.
+ */
+function initialFormatId(session) {
+  const hash = window.location.hash.replace('#', '');
+  if (FORMATS.some((entry) => entry.id === hash)) return hash;
+  return FORMATS.some((entry) => entry.id === session.formatId) ? session.formatId : 'json';
+}
+
+/**
  * App shell: brand topbar, format switcher, global file opener, theme.
  * Each format owns its workspace under `src/formats/<id>/` and is
  * code-split — the JSON bundle stays lean until Parquet/Avro are opened.
  */
 export default function App() {
   const [session] = useState(readSession);
-  const [formatId, setFormatId] = useState(() =>
-    FORMATS.some((entry) => entry.id === session.formatId) ? session.formatId : 'json',
-  );
+  const [formatId, setFormatId] = useState(() => initialFormatId(session));
   const [theme, setTheme] = useState(session.theme ?? 'dark');
   const [toast, setToast] = useState(null);
   const [incomingFile, setIncomingFile] = useState(null);
   const [pageDragging, setPageDragging] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
 
   const notify = useCallback((message, tone = 'info') => {
     setToast({ message, tone, id: Date.now() });
@@ -62,6 +72,81 @@ export default function App() {
   }, [toast]);
 
   const switchFormat = useCallback((id) => setFormatId(getFormat(id).id), []);
+
+  const toggleTheme = useCallback(
+    () => setTheme((current) => (current === 'dark' ? 'light' : 'dark')),
+    [],
+  );
+
+  const openPicker = useCallback(() => {
+    document.getElementById('formatify-global-file')?.click();
+  }, []);
+
+  // Browser tab title always mirrors the active workspace.
+  useEffect(() => {
+    document.title = `${getFormat(formatId).label} · Formatify`;
+  }, [formatId]);
+
+  // Keep the deep link in sync (replaceState → no history spam, no hashchange loop).
+  useEffect(() => {
+    const next = `#${formatId}`;
+    if (window.location.hash !== next) {
+      window.history.replaceState(null, '', next);
+    }
+  }, [formatId]);
+
+  // Honour manual hash edits / pasted URLs while the app is open.
+  useEffect(() => {
+    const onHashChange = () => {
+      const id = window.location.hash.replace('#', '');
+      if (FORMATS.some((entry) => entry.id === id)) setFormatId(id);
+    };
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
+
+  // Global shortcuts. Typing targets (inputs, the JSON editor) are never hijacked.
+  useEffect(() => {
+    const isTyping = (target) =>
+      target instanceof HTMLElement &&
+      (target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.tagName === 'SELECT' ||
+        target.isContentEditable);
+
+    const onKeyDown = (event) => {
+      const meta = event.metaKey || event.ctrlKey;
+      const key = event.key;
+
+      if (meta && !event.altKey && ['1', '2', '3'].includes(key)) {
+        event.preventDefault();
+        switchFormat(FORMATS[Number(key) - 1].id);
+        return;
+      }
+      if (meta && !event.shiftKey && !event.altKey && (key === 'o' || key === 'O')) {
+        event.preventDefault();
+        openPicker();
+        return;
+      }
+      if (meta && event.shiftKey && (key === 'l' || key === 'L')) {
+        event.preventDefault();
+        toggleTheme();
+        return;
+      }
+      if (key === 'Escape') {
+        setHelpOpen(false);
+        return;
+      }
+      if (!meta && key === '?') {
+        if (isTyping(event.target)) return;
+        event.preventDefault();
+        setHelpOpen((open) => !open);
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [switchFormat, openPicker, toggleTheme]);
 
   const openFile = useCallback(
     async (file) => {
@@ -124,56 +209,77 @@ export default function App() {
     <div className="app">
       <header className="topbar">
         <div className="brand">
-          <span className="brand-mark">
+          <button
+            type="button"
+            className="brand-mark"
+            onClick={() => switchFormat('json')}
+            title="Formatify home — go to the JSON workspace"
+            aria-label="Formatify home"
+          >
             <Icon name="braces" size={18} />
-          </span>
+          </button>
           <div className="brand-text">
             <h1>Formatify</h1>
             <p>
-              Beautify and validate JSON — or drop in Parquet and Avro files to inspect their
-              schemas and rows.
+              Beautify and validate JSON, or drop in Parquet, Avro, CSV and YAML files to inspect
+              their schemas and rows — all privacy-first, entirely in your browser.
             </p>
           </div>
         </div>
 
+        <nav className="format-switcher" aria-label="Formats">
+          <div className="tab-track">
+            {FORMATS.map((entry, index) => (
+              <button
+                key={entry.id}
+                type="button"
+                className={entry.id === format.id ? 'format-tab is-active' : 'format-tab'}
+                aria-pressed={entry.id === format.id}
+                aria-current={entry.id === format.id ? 'page' : undefined}
+                onClick={() => switchFormat(entry.id)}
+                title={`${entry.description} — ⌘/Ctrl + ${index + 1}`}
+                data-key={index + 1}
+              >
+                <span className="tab-dot" style={{ background: entry.hue }} aria-hidden="true" />
+                <Icon name={entry.icon} size={15} />
+                <span>{entry.label}</span>
+              </button>
+            ))}
+          </div>
+          <span className="format-switcher-hint">{format.description}</span>
+        </nav>
+
         <div className="topbar-right">
           <button
             type="button"
+            className="icon-btn"
+            onClick={() => setHelpOpen((open) => !open)}
+            title="Keyboard shortcuts (?)"
+            aria-label="Keyboard shortcuts"
+          >
+            <Icon name="help" />
+          </button>
+          <button
+            type="button"
             className="btn"
-            onClick={() => document.getElementById('formatify-global-file')?.click()}
-            title="Open any supported file — it routes to the right reader"
+            onClick={openPicker}
+            title="Open any supported file — it routes to the right reader (⌘/Ctrl + O)"
           >
             <Icon name="upload" />
             <span>Open file</span>
+            <kbd className="hint-kbd">⌘O</kbd>
           </button>
           <button
             type="button"
             className="icon-btn"
-            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-            title={`Switch to the ${theme === 'dark' ? 'light' : 'dark'} theme`}
+            onClick={toggleTheme}
+            title={`Switch to the ${theme === 'dark' ? 'light' : 'dark'} theme (⌘/Ctrl + ⇧ + L)`}
             aria-label="Toggle colour theme"
           >
             <Icon name={theme === 'dark' ? 'sun' : 'moon'} />
           </button>
         </div>
       </header>
-
-      <nav className="format-switcher" aria-label="Formats">
-        {FORMATS.map((entry) => (
-          <button
-            key={entry.id}
-            type="button"
-            className={entry.id === format.id ? 'format-tab is-active' : 'format-tab'}
-            aria-pressed={entry.id === format.id}
-            onClick={() => switchFormat(entry.id)}
-            title={entry.description}
-          >
-            <Icon name={entry.icon} size={15} />
-            <span>{entry.label}</span>
-          </button>
-        ))}
-        <span className="format-switcher-hint">{format.description}</span>
-      </nav>
 
       <Suspense fallback={<p className="empty-hint">Loading the {format.label} workspace…</p>}>
         <Panel notify={notify} openRequest={incomingFile} />
@@ -199,6 +305,8 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {helpOpen && <ShortcutsHelp onClose={() => setHelpOpen(false)} />}
 
       <Toast toast={toast} onDismiss={() => setToast(null)} />
     </div>

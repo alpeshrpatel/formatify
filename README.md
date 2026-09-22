@@ -1,8 +1,9 @@
-# Formatify — JSON beautifier, validator & binary data inspector
+# Formatify — The Privacy-First Developer Toolkit for JSON, Parquet, Avro, CSV, YAML
 
 A beautiful, dependency-light React app that beautifies, minifies and validates JSON — and when
-something is wrong it tells you **exactly** where and why. It also reads **Apache Parquet** and
-**Apache Avro** files: schema, metadata and a searchable row preview, entirely in the browser.
+something is wrong it tells you **exactly** where and why. It also reads **Apache Parquet**,
+**Apache Avro**, **CSV** and **YAML** files: schema, metadata and a searchable row preview,
+entirely in the browser. Nothing leaves your machine.
 
 
 ```
