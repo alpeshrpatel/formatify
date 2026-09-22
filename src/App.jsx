@@ -3,6 +3,7 @@ import { Suspense, lazy, useCallback, useEffect, useState } from 'react';
 import Icon from './components/Icon.jsx';
 import Toast from './components/Toast.jsx';
 import { FORMATS, detectFormat, getFormat } from './formats/index.js';
+import { readFileBytes } from './formats/shared/binaryUtils.js';
 
 /** One lazy panel per format id, created on first use and cached. */
 const PANEL_CACHE = new Map();
@@ -36,6 +37,7 @@ export default function App() {
   const [theme, setTheme] = useState(session.theme ?? 'dark');
   const [toast, setToast] = useState(null);
   const [incomingFile, setIncomingFile] = useState(null);
+  const [pageDragging, setPageDragging] = useState(false);
 
   const notify = useCallback((message, tone = 'info') => {
     setToast({ message, tone, id: Date.now() });
@@ -66,7 +68,7 @@ export default function App() {
       if (!file) return;
       let bytes;
       try {
-        bytes = new Uint8Array(await file.arrayBuffer());
+        bytes = await readFileBytes(file); // arrayBuffer, with a FileReader fallback
       } catch {
         notify(`Could not read ${file.name}`, 'error');
         return;
@@ -78,6 +80,42 @@ export default function App() {
     },
     [notify],
   );
+
+  // Drop anywhere on the page: route the file through the same opener as the
+  // topbar button. Inner drop targets (DropZone, the JSON editor) call
+  // preventDefault first and keep priority; the overlay is feedback only.
+  useEffect(() => {
+    const hasFiles = (event) =>
+      Boolean(event.dataTransfer) && Array.from(event.dataTransfer.types ?? []).includes('Files');
+    const handleDragOver = (event) => {
+      if (!hasFiles(event)) return;
+      event.preventDefault(); // without this the browser never fires `drop`
+      setPageDragging(true);
+    };
+    const handleDrop = (event) => {
+      if (!hasFiles(event)) return;
+      setPageDragging(false);
+      if (event.defaultPrevented) return; // an inner drop target already claimed it
+      event.preventDefault(); // stop the browser navigating to the file itself
+      const file = event.dataTransfer.files?.[0];
+      if (file) openFile(file);
+    };
+    const handleDragEnd = (event) => {
+      // `dragleave` fires for child hops too; only treat it as "left the window".
+      if (event.type === 'dragleave' && event.relatedTarget) return;
+      setPageDragging(false);
+    };
+    document.addEventListener('dragover', handleDragOver);
+    document.addEventListener('drop', handleDrop);
+    document.addEventListener('dragleave', handleDragEnd);
+    document.addEventListener('dragend', handleDragEnd);
+    return () => {
+      document.removeEventListener('dragover', handleDragOver);
+      document.removeEventListener('drop', handleDrop);
+      document.removeEventListener('dragleave', handleDragEnd);
+      document.removeEventListener('dragend', handleDragEnd);
+    };
+  }, [openFile]);
 
   const format = getFormat(formatId);
   const Panel = getPanel(format);
@@ -152,6 +190,15 @@ export default function App() {
           event.target.value = '';
         }}
       />
+
+      {pageDragging && (
+        <div className="drop-overlay" aria-hidden="true">
+          <div className="drop-overlay-card">
+            <Icon name="upload" size={18} />
+            <span>Drop to open — we&apos;ll route it to the right reader</span>
+          </div>
+        </div>
+      )}
 
       <Toast toast={toast} onDismiss={() => setToast(null)} />
     </div>

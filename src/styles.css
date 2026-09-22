@@ -1247,6 +1247,9 @@ button {
   background: var(--danger-soft);
   border-radius: var(--radius-sm);
   padding: 12px 14px;
+  margin-top: 10px;
+}
+
 /* ------------------------------- drop zone ------------------------------- */
 
 .dropzone {
@@ -1291,6 +1294,33 @@ button {
   color: var(--accent-2);
   text-decoration: underline;
   cursor: pointer;
+}
+
+/* --------------------------- page drop overlay --------------------------- */
+
+.drop-overlay {
+  position: fixed;
+  inset: 12px;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  border: 2px dashed var(--accent);
+  border-radius: 16px;
+  background: var(--accent-soft);
+}
+
+.drop-overlay-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 18px;
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  background: var(--panel-2);
+  backdrop-filter: blur(6px);
+  font-weight: 600;
+  font-size: 14px;
 }
 
 /* ---------------------------- records table ------------------------------ */
@@ -1576,9 +1606,6 @@ button {
 .pager {
   display: flex;
   gap: 6px;
-}
-
-  margin-top: 10px;
 }
 
 .error-title {

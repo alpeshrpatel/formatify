@@ -9,11 +9,14 @@
  * dev-only test suite cross-validates us against `avsc` output.
  *
  * Supported: every primitive, records, enums, arrays, maps, unions, fixed,
- * named-type references, `null` and `deflate` codecs, zig-zag varints, block
- * framing with sync markers, metadata (incl. `avro.schema`, `avro.codec`).
- * Not supported: `snappy` / `bzip2` / `zstandard` codecs (clear error naming
- * the codec), schema-resolution defaults (writer schema is authoritative).
+ * named-type references, `null`, `deflate` and `snappy` codecs, zig-zag
+ * varints, block framing with sync markers, metadata (incl. `avro.schema`,
+ * `avro.codec`).
+ * Not supported: `bzip2` / `xz` / `zstandard` codecs (clear error naming the
+ * codec), schema-resolution defaults (writer schema is authoritative).
  */
+
+import { crc32, snappyDecompress } from './snappy.js';
 
 export const AVRO_MAGIC = [0x4f, 0x62, 0x6a, 0x01]; // `Obj\x01`
 
@@ -92,6 +95,54 @@ class Cursor {
       throw new AvroError('Invalid UTF-8 in a string or metadata value');
     }
   }
+}
+
+/**
+ * Decode one snappy-codec block payload.
+ *
+ * Per the Avro OCF spec the snappy payload is the compressed stream followed
+ * by a 4-byte big-endian CRC-32 of the *uncompressed* data. Some writers
+ * (notably the `avsc` package) omit that checksum, so after a checksum
+ * mismatch we retry the payload verbatim before giving up.
+ */
+export function decodeSnappyBlock(payload, blockIndex = 0) {
+  if (payload.length === 0) {
+    throw new AvroError(`Data block ${blockIndex} has an empty snappy payload.`, 0);
+  }
+  const compressed = payload.subarray(0, payload.length - 4);
+  const storedCrc =
+    ((payload[payload.length - 4] << 24) |
+      (payload[payload.length - 3] << 16) |
+      (payload[payload.length - 2] << 8) |
+      payload[payload.length - 1]) >>>
+    0;
+
+  const attempts = [
+    { data: compressed, expectedCrc: storedCrc, label: 'with checksum' },
+    { data: payload, expectedCrc: null, label: 'without checksum' },
+  ];
+  let firstError = null;
+  for (const attempt of attempts) {
+    let uncompressed;
+    try {
+      uncompressed = snappyDecompress(attempt.data);
+    } catch (cause) {
+      firstError ??= cause;
+      continue;
+    }
+    if (attempt.expectedCrc == null || crc32(uncompressed) === attempt.expectedCrc) {
+      return uncompressed;
+    }
+    firstError ??= new Error(
+      `checksum mismatch: stored 0x${attempt.expectedCrc.toString(16)}, computed ` +
+        `0x${crc32(uncompressed).toString(16)} — the file is likely corrupt`,
+    );
+  }
+  throw new AvroError(
+    `Could not decompress the snappy payload of data block ${blockIndex}: ` +
+      `${firstError?.message ?? firstError}`,
+    0,
+  );
 }
 
 /** Inflate raw-DEFLATE payloads (Avro's `deflate` codec is RFC 1951, not zlib). */
@@ -444,15 +495,16 @@ export function scanAvroBlocks(bytes, header = readAvroHeader(bytes)) {
 
 /**
  * Decode at most `limit` records; returns `{ records, totalCount, truncated }`.
- * Codec support: `null` (raw) and `deflate` (via DecompressionStream).
+ * Codec support: `null` (raw), `deflate` (DecompressionStream) and `snappy`
+ * (hand-written decoder in `./snappy.js`, with CRC verification).
  * Anything else throws an `AvroError` naming the codec.
  */
 export async function readAvroPreview(bytes, { limit = 1000 } = {}) {
   const header = readAvroHeader(bytes);
-  if (!['null', 'deflate'].includes(header.codec)) {
+  if (!['null', 'deflate', 'snappy'].includes(header.codec)) {
     throw new AvroError(
-      `Unsupported Avro codec "${header.codec}". This reader supports "null" and "deflate" — ` +
-        `re-encode the file without compression to inspect it here.`,
+      `Unsupported Avro codec "${header.codec}". This reader supports "null", "deflate" and ` +
+        `"snappy" — re-encode the file with one of those codecs to inspect it here.`,
     );
   }
   const records = [];
@@ -486,7 +538,12 @@ export async function readAvroPreview(bytes, { limit = 1000 } = {}) {
     }
     pos = cursor.pos + Number(byteSize) + 16;
 
-    const payloadBytes = header.codec === 'deflate' ? await inflateDeflate(payload) : payload;
+    const payloadBytes =
+      header.codec === 'snappy'
+        ? decodeSnappyBlock(payload, blockIndex)
+        : header.codec === 'deflate'
+          ? await inflateDeflate(payload)
+          : payload;
     const data = new Cursor(payloadBytes);
     const remaining = () => limit - records.length;
     const take = count < 0n ? Number.MAX_SAFE_INTEGER : Number(count);

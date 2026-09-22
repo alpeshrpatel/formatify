@@ -10,9 +10,12 @@ import Toolbar from './Toolbar.jsx';
 import { beautifyJson, formatBytes, minifyJson, utf8Size } from './jsonFormatter.js';
 import { validateJson } from './jsonParser.js';
 import { repairJson } from './jsonRepair.js';
-import { DEFAULT_SAMPLE, SAMPLES } from './samples.js';
+import { SAMPLES } from './samples.js';
 
 const STORAGE_KEY = 'formatify:json:v1';
+
+/** What a fresh visit starts with: a valid, empty JSON payload. */
+const EMPTY_DOCUMENT = '{}';
 
 function readSession() {
   try {
@@ -30,16 +33,17 @@ function readSession() {
 export default function JsonPanel({ notify: notifyProp, openRequest }) {
   const session = useMemo(readSession, []);
 
-  const [text, setText] = useState(session.text ?? DEFAULT_SAMPLE.text);
+  const [text, setText] = useState(session.text ?? EMPTY_DOCUMENT);
   const [indent, setIndent] = useState(session.indent ?? '2');
   const [sortKeys, setSortKeys] = useState(session.sortKeys ?? false);
   const [tab, setTab] = useState(() =>
-    validateJson(session.text ?? DEFAULT_SAMPLE.text).ok ? 'tree' : 'problems',
+    validateJson(session.text ?? EMPTY_DOCUMENT).ok ? 'tree' : 'problems',
   );
   const [toast, setToast] = useState(null);
   const [fixNotes, setFixNotes] = useState([]);
-  const [sourceLabel, setSourceLabel] = useState(DEFAULT_SAMPLE.label);
-  const [sampleIndex, setSampleIndex] = useState(0);
+  const [sourceLabel, setSourceLabel] = useState('untitled');
+  // -1 so the first click on "Sample" loads SAMPLES[0] instead of skipping it.
+  const [sampleIndex, setSampleIndex] = useState(-1);
 
   const editorRef = useRef(null);
   const fileInputRef = useRef(null);

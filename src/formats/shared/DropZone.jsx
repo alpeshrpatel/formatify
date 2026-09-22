@@ -12,11 +12,20 @@ export default function DropZone({ accept, onFile, compact = false, hint }) {
   return (
     <div
       className={dragging ? 'dropzone is-dragging' : 'dropzone'}
+      onDragEnter={(e) => {
+        e.preventDefault();
+        setDragging(true);
+      }}
       onDragOver={(e) => {
         e.preventDefault();
         setDragging(true);
       }}
-      onDragLeave={() => setDragging(false)}
+      onDragLeave={(e) => {
+        // Moving between children keeps the highlight; only leaving the zone clears it.
+        if (!(e.relatedTarget instanceof Node) || !e.currentTarget.contains(e.relatedTarget)) {
+          setDragging(false);
+        }
+      }}
       onDrop={(e) => {
         e.preventDefault();
         setDragging(false);

@@ -22,6 +22,7 @@
     "avsc": "^5.7.9",
     "hyparquet-writer": "^0.16.9",
     "jsdom": "^30.1.0",
+    "snappyjs": "^0.7.0",
     "vite": "^7.1.12"
   }
 }
