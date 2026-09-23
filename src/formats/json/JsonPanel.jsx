@@ -3,7 +3,11 @@ import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } f
 import Icon from '../../components/Icon.jsx';
 import Toast from '../../components/Toast.jsx';
 import ErrorPanel from './ErrorPanel.jsx';
+import JsonConvertPanel from './JsonConvertPanel.jsx';
+import JsonDiffPanel from './JsonDiffPanel.jsx';
 import JsonEditor from './JsonEditor.jsx';
+import JsonPathPanel from './JsonPathPanel.jsx';
+import JsonSchemaPanel from './JsonSchemaPanel.jsx';
 import JsonTree from './JsonTree.jsx';
 import StatsBar from './StatsBar.jsx';
 import Toolbar from './Toolbar.jsx';
@@ -82,8 +86,14 @@ export default function JsonPanel({ notify: notifyProp, openRequest }) {
   const previousOk = useRef(null);
   useEffect(() => {
     if (previousOk.current === result.ok) return;
+    const wasFirstRun = previousOk.current === null;
     previousOk.current = result.ok;
-    setTab(result.ok ? 'tree' : 'problems');
+    // Only steer the user away from a utility tab when the parse state
+    // actually broke; never yank them out of Diff / Convert / Schema.
+    if (!result.ok) setTab('problems');
+    else if (wasFirstRun || tab === 'problems') setTab('tree');
+    // `tab` is intentionally excluded: this effect reacts to validity changes only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [result.ok]);
 
   const copyToClipboard = useCallback(
@@ -132,6 +142,15 @@ export default function JsonPanel({ notify: notifyProp, openRequest }) {
       notify(minifyError.message, 'error');
     }
   }, [error, goToError, notify, sortKeys, text]);
+
+  const handleSendToEditor = useCallback(
+    (nextText, label) => {
+      setText(nextText);
+      setFixNotes([]);
+      notify(`Loaded ${label} into the editor`, 'success');
+    },
+    [notify],
+  );
 
   const handleAutoFix = useCallback(() => {
     const repaired = repairJson(text);
@@ -281,7 +300,7 @@ export default function JsonPanel({ notify: notifyProp, openRequest }) {
 
         <section className="panel">
           <header className="panel-head">
-            <div className="tabs" role="tablist" aria-label="Output">
+            <div className="tabs" role="tablist" aria-label="JSON tools">
               <button
                 type="button"
                 role="tab"
@@ -305,8 +324,72 @@ export default function JsonPanel({ notify: notifyProp, openRequest }) {
                 <Icon name="braces" size={14} />
                 Tree
               </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={tab === 'jsonpath'}
+                className={tab === 'jsonpath' ? 'tab is-active' : 'tab'}
+                onClick={() => setTab('jsonpath')}
+                disabled={!result.ok}
+                title="Query with JSONPath expressions"
+              >
+                <Icon name="search" size={14} />
+                JSONPath
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={tab === 'diff'}
+                className={tab === 'diff' ? 'tab is-active' : 'tab'}
+                onClick={() => setTab('diff')}
+                title="Compare against another JSON document"
+              >
+                <Icon name="diff" size={14} />
+                Diff
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={tab === 'convert'}
+                className={tab === 'convert' ? 'tab is-active' : 'tab'}
+                onClick={() => setTab('convert')}
+                disabled={!result.ok}
+                title="Convert to and from YAML, XML and CSV"
+              >
+                <Icon name="convert" size={14} />
+                Convert
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={tab === 'schema'}
+                className={tab === 'schema' ? 'tab is-active' : 'tab'}
+                onClick={() => setTab('schema')}
+                disabled={!result.ok}
+                title="Validate against a JSON Schema, or infer one"
+              >
+                <Icon name="schema" size={14} />
+                Schema
+              </button>
             </div>
             <span className="panel-hint">{formatSummary}</span>
+            <label className="select-wrap view-menu" title="Choose a JSON view">
+              <span className="select-label">View</span>
+              <select value={tab} onChange={(event) => setTab(event.target.value)}>
+                <optgroup label="Document">
+                  <option value="problems">Problems</option>
+                  <option value="tree">Tree</option>
+                </optgroup>
+                <optgroup label="Query & compare">
+                  <option value="jsonpath">JSONPath</option>
+                  <option value="diff">Diff Viewer</option>
+                  <option value="schema">Schema validation</option>
+                </optgroup>
+                <optgroup label="Convert">
+                  <option value="convert">YAML / XML / CSV</option>
+                </optgroup>
+              </select>
+            </label>
           </header>
 
           {fixNotes.length > 0 && (
@@ -341,18 +424,34 @@ export default function JsonPanel({ notify: notifyProp, openRequest }) {
               onJump={goToError}
               onAutoFix={handleAutoFix}
             />
-          ) : result.ok ? (
+          ) : !result.ok && tab !== 'diff' ? (
+            <div className="panel-body">
+              <p className="empty-hint">
+                This view needs valid JSON. Fix the reported problem first — or try the Diff tab.
+              </p>
+            </div>
+          ) : tab === 'jsonpath' ? (
+            <JsonPathPanel data={result.value} />
+          ) : tab === 'diff' ? (
+            <JsonDiffPanel data={result.ok ? result.value : undefined} text={text} />
+          ) : tab === 'convert' ? (
+            <JsonConvertPanel
+              data={result.value}
+              onSendToEditor={handleSendToEditor}
+              notify={notify}
+            />
+          ) : tab === 'schema' ? (
+            <JsonSchemaPanel
+              data={result.value}
+              onSendToEditor={handleSendToEditor}
+              notify={notify}
+            />
+          ) : (
             <JsonTree
               value={result.value}
               sortKeys={sortKeys}
               onCopyValue={(value, type) => copyToClipboard(value, `${type} value`)}
             />
-          ) : (
-            <div className="panel-body">
-              <p className="empty-hint">
-                The tree appears once the document parses. Fix the reported problem first.
-              </p>
-            </div>
           )}
         </section>
       </main>

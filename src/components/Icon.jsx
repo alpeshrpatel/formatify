@@ -70,6 +70,25 @@ const ICONS = {
     </>
   ),
   braces: <path d="M9 3H7a2 2 0 00-2 2v4a2 2 0 01-2 2 2 2 0 012 2v4a2 2 0 002 2h2M15 3h2a2 2 0 012 2v4a2 2 0 002 2 2 2 0 00-2 2v4a2 2 0 01-2 2h-2" />,
+  diff: (
+    <>
+      <path d="M12 3v18" />
+      <path d="M7 8L4 11l3 3" />
+      <path d="M17 8l3 3-3 3" />
+    </>
+  ),
+  convert: (
+    <>
+      <path d="M4 8h13m0 0l-3-3m3 3l-3 3" />
+      <path d="M20 16H7m0 0l3-3m-3 3l3 3" />
+    </>
+  ),
+  schema: (
+    <>
+      <path d="M12 3l7 3v6c0 4.2-2.9 7.6-7 9-4.1-1.4-7-4.8-7-9V6z" />
+      <path d="M9 12l2 2 4-4" />
+    </>
+  ),
 };
 
 export default function Icon({ name, size = 16, className }) {

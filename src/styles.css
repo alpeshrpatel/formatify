@@ -531,6 +531,19 @@ button {
   }
 }
 
+/* ------------------------- json view menu ------------------------------- */
+
+.view-menu {
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+.output-card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 /* ------------------------------- editor --------------------------------- */
 
 .editor {
@@ -1049,7 +1062,77 @@ button {
   padding-left: 24px;
 }
 
-/* ------------------------------- toast ---------------------------------- */
+/* -------------------------------- jsonpath -------------------------------- */
+
+.jsonpath-panel {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.jsonpath-query-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel-2);
+}
+
+.jsonpath-query-row svg {
+  color: var(--faint);
+  flex: 0 0 auto;
+}
+
+.jsonpath-input {
+  flex: 1 1 auto;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--panel-solid);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  outline: none;
+  transition: border-color 0.16s ease;
+}
+
+.jsonpath-input:focus {
+  border-color: var(--accent-2);
+}
+
+.jsonpath-input::placeholder {
+  color: var(--faint);
+}
+
+.jsonpath-count {
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--faint);
+  white-space: nowrap;
+}
+
+.jsonpath-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  color: var(--danger);
+  font-size: 12.8px;
+}
+
+.jsonpath-error svg {
+  color: var(--danger);
+  flex: 0 0 auto;
+}
+
+.jsonpath-results {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
 
 .toast {
   position: fixed;
@@ -1838,6 +1921,382 @@ kbd {
 }
 
 
+
+
+
+/* ==========================================================================
+   JSON Diff, Convert and Schema panels
+   ========================================================================== */
+
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.diff-panel,
+.convert-panel,
+.schema-panel {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+}
+
+.diff-toolbar,
+.schema-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel-2);
+}
+
+.schema-toolbar {
+  gap: 8px;
+}
+
+.diff-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.diff-chip {
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  border: 1px solid transparent;
+}
+
+.diff-chip.is-added {
+  color: var(--ok);
+  background: var(--ok-soft);
+  border-color: color-mix(in srgb, var(--ok) 40%, transparent);
+}
+
+.diff-chip.is-removed {
+  color: var(--danger);
+  background: var(--danger-soft);
+  border-color: color-mix(in srgb, var(--danger) 40%, transparent);
+}
+
+.diff-chip.is-changed {
+  color: var(--warn);
+  background: var(--warn-soft);
+  border-color: color-mix(in srgb, var(--warn) 40%, transparent);
+}
+
+.diff-input-row,
+.schema-editor-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.diff-input-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.diff-textarea {
+  width: 100%;
+  resize: vertical;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--panel-solid);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.55;
+  outline: none;
+  transition: border-color 0.16s ease;
+}
+
+.diff-textarea:focus {
+  border-color: var(--accent-2);
+}
+
+.diff-textarea::placeholder {
+  color: var(--faint);
+}
+
+.schema-textarea {
+  min-height: 180px;
+}
+
+.diff-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 12px 14px;
+  overflow: auto;
+}
+
+.diff-identical {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--ok);
+  font-size: 13px;
+}
+
+.diff-change-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.diff-change {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 11px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+}
+
+.diff-change.is-added {
+  border-color: color-mix(in srgb, var(--ok) 34%, transparent);
+}
+
+.diff-change.is-removed {
+  border-color: color-mix(in srgb, var(--danger) 34%, transparent);
+}
+
+.diff-change.is-changed {
+  border-color: color-mix(in srgb, var(--warn) 34%, transparent);
+}
+
+.diff-badge {
+  flex: 0 0 auto;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.diff-badge.is-added {
+  color: var(--ok);
+  background: var(--ok-soft);
+}
+
+.diff-badge.is-removed {
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.diff-badge.is-changed {
+  color: var(--warn);
+  background: var(--warn-soft);
+}
+
+.diff-path {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--json-key);
+  word-break: break-all;
+}
+
+.diff-values {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.diff-values svg {
+  color: var(--faint);
+  flex: 0 0 auto;
+}
+
+.diff-old {
+  color: var(--danger);
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--danger) 55%, transparent);
+}
+
+.diff-new {
+  color: var(--ok);
+}
+
+.diff-lines {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
+.diff-line {
+  display: flex;
+  gap: 10px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.diff-line.is-add {
+  background: var(--ok-soft);
+}
+
+.diff-line.is-del {
+  background: var(--danger-soft);
+}
+
+.diff-sign {
+  flex: 0 0 auto;
+  width: 1ch;
+  color: var(--faint);
+  user-select: none;
+}
+
+.diff-line.is-add .diff-sign {
+  color: var(--ok);
+}
+
+.diff-line.is-del .diff-sign {
+  color: var(--danger);
+}
+
+/* ---------- Convert panel ---------- */
+
+.convert-panel {
+  gap: 0;
+}
+
+.convert-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.convert-section:last-child {
+  border-bottom: none;
+}
+
+.convert-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.convert-head h3 {
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  color: var(--text);
+}
+
+.convert-head svg {
+  color: var(--accent-2);
+}
+
+.convert-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.convert-actions .panel-hint {
+  margin-right: auto;
+}
+
+.convert-output {
+  margin: 0;
+  max-height: 340px;
+  overflow: auto;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--panel-solid);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.6;
+  white-space: pre;
+  tab-size: 2;
+}
+
+/* ---------- Schema panel ---------- */
+
+.schema-status {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 12px 14px 0;
+  padding: 10px 13px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  border: 1px solid var(--border);
+}
+
+.schema-status.is-valid {
+  color: var(--ok);
+  background: var(--ok-soft);
+  border-color: color-mix(in srgb, var(--ok) 38%, transparent);
+}
+
+.schema-status.is-invalid {
+  color: var(--danger);
+  background: var(--danger-soft);
+  border-color: color-mix(in srgb, var(--danger) 38%, transparent);
+}
+
+.schema-error-list {
+  list-style: none;
+  margin: 0;
+  padding: 12px 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.schema-error {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 11px;
+  border: 1px solid color-mix(in srgb, var(--danger) 30%, transparent);
+  border-radius: var(--radius-sm);
+  background: var(--panel-2);
+}
+
+.schema-error-message {
+  flex: 1 1 240px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
 
 
 

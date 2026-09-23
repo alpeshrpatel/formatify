@@ -32,6 +32,8 @@ expose('CustomEvent', window.CustomEvent);
 expose('MouseEvent', window.MouseEvent);
 expose('KeyboardEvent', window.KeyboardEvent);
 expose('getComputedStyle', window.getComputedStyle.bind(window));
+expose('DOMParser', window.DOMParser);
+expose('XMLSerializer', window.XMLSerializer);
 expose('requestAnimationFrame', window.requestAnimationFrame.bind(window));
 expose('cancelAnimationFrame', window.cancelAnimationFrame.bind(window));
 expose('IS_REACT_ACT_ENVIRONMENT', true);
