@@ -2,6 +2,7 @@ import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { jsonPath } from '../jsonPath.js';
+import { DEFAULT_SAMPLE } from '../samples.js';
 
 /** A canonical bookstore fixture — the shape used by most JSONPath examples. */
 const store = {
@@ -234,5 +235,20 @@ describe('jsonPath — robustness', () => {
     jsonPath(store, '$..price');
     jsonPath(store, '$.store.book[?(@.price > 1)]');
     assert.deepEqual(store, original);
+  });
+});
+
+
+/* -------------------------------------------------------------------------- */
+/* default query                                                               */
+/* -------------------------------------------------------------------------- */
+
+describe('jsonPath — default query', () => {
+  test("the panel's default expression '$' queries the root without error", () => {
+    const sample = JSON.parse(DEFAULT_SAMPLE.text);
+    let results = null;
+    assert.doesNotThrow(() => { results = jsonPath(sample, '$'); });
+    assert.equal(results.length, 1);
+    assert.deepEqual(results[0], sample);
   });
 });

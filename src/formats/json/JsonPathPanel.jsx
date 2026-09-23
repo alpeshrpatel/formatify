@@ -13,7 +13,7 @@ import { jsonPath } from './jsonPath.js';
  * used by `jsonPath.js`, so this panel stays zero-dependency.
  */
 export default function JsonPathPanel({ data }) {
-  const [expr, setExpr] = useState('$.');
+  const [expr, setExpr] = useState('$');
 
   const { results, count, error } = useMemo(() => {
     if (!data) return { results: [], count: 0, error: null };
