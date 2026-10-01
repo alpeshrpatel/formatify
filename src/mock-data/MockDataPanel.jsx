@@ -1,9 +1,10 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 
 import Icon from '../components/Icon.jsx';
 import { downloadFile, formatBytes } from '../formats/shared/binaryUtils.js';
 import { toAvroBuffer, toCsv, toParquetBuffer, toYaml } from '../formats/json/jsonConvert.js';
 import { generatePayload, inferSchemaFromPayload } from './generatePayload.js';
+import { parseOpenApiSpec } from './openApi.js';
 
 const MAX_RECORDS = 500;
 const OUTPUT_FORMATS = [
@@ -62,18 +63,28 @@ export default function MockDataPanel({ notify, onSendToEditor }) {
   const [payloadText, setPayloadText] = useState(STARTER_PAYLOAD);
   const [schemaInput, setSchemaInput] = useState('schema');
   const [schemaError, setSchemaError] = useState('');
+  const [openApiText, setOpenApiText] = useState('');
+  const [openApiDocument, setOpenApiDocument] = useState(null);
+  const [operationId, setOperationId] = useState('');
+  const [schemaOptionId, setSchemaOptionId] = useState('');
   const [count, setCount] = useState(10);
   const [outputFormat, setOutputFormat] = useState('json');
   const [artifact, setArtifact] = useState(null);
   const [error, setError] = useState('');
   const [generating, setGenerating] = useState(false);
+  const [loadingOpenApi, setLoadingOpenApi] = useState(false);
+  const openApiFileRef = useRef(null);
+
+  const selectedOperation = openApiDocument?.operations.find((operation) => operation.id === operationId);
+  const selectedSchemaOption = selectedOperation?.schemaOptions.find((option) => option.id === schemaOptionId);
 
   const handleGenerate = useCallback(async () => {
     setError('');
     setArtifact(null);
     setGenerating(true);
     try {
-      const schema = JSON.parse(schemaText);
+      const schema = schemaInput === 'openapi' ? selectedSchemaOption?.schema : JSON.parse(schemaText);
+      if (!schema) throw new Error('Load an OpenAPI spec and choose an operation payload schema first.');
       const records = await generatePayload(schema, count);
       const format = OUTPUT_FORMATS.find((entry) => entry.id === outputFormat);
       const fileName = `api-payload.${format.extension}`;
@@ -104,7 +115,7 @@ export default function MockDataPanel({ notify, onSendToEditor }) {
     } finally {
       setGenerating(false);
     }
-  }, [count, notify, outputFormat, schemaText]);
+  }, [count, notify, outputFormat, schemaInput, schemaText, selectedSchemaOption]);
 
   const handleInferSchema = useCallback(() => {
     try {
@@ -118,6 +129,60 @@ export default function MockDataPanel({ notify, onSendToEditor }) {
       setSchemaError(cause instanceof Error ? cause.message : 'The example payload is not valid JSON.');
     }
   }, [notify, payloadText]);
+
+  const handleLoadOpenApi = useCallback(async () => {
+    setSchemaError('');
+    setLoadingOpenApi(true);
+    try {
+      const document = await parseOpenApiSpec(openApiText);
+      const firstOperation = document.operations[0];
+      setOpenApiDocument(document);
+      setOperationId(firstOperation.id);
+      setSchemaOptionId(firstOperation.schemaOptions[0].id);
+      setArtifact(null);
+      notify?.(`Loaded ${document.title} · ${document.operations.length} operations`, 'success');
+    } catch (cause) {
+      setOpenApiDocument(null);
+      setOperationId('');
+      setSchemaOptionId('');
+      setSchemaError(cause instanceof Error ? cause.message : 'Could not read this OpenAPI document.');
+    } finally {
+      setLoadingOpenApi(false);
+    }
+  }, [notify, openApiText]);
+
+  const handleOpenApiFile = useCallback(async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      setOpenApiText(await file.text());
+      setOpenApiDocument(null);
+      setOperationId('');
+      setSchemaOptionId('');
+      setSchemaError('');
+      setArtifact(null);
+    } catch (cause) {
+      setSchemaError(cause instanceof Error ? cause.message : 'Could not read that OpenAPI file.');
+    } finally {
+      event.target.value = '';
+    }
+  }, []);
+
+  const handleOperationChange = (event) => {
+    const nextId = event.target.value;
+    const operation = openApiDocument?.operations.find((entry) => entry.id === nextId);
+    setOperationId(nextId);
+    setSchemaOptionId(operation?.schemaOptions[0]?.id ?? '');
+    setArtifact(null);
+  };
+
+  const handleEditOpenApiSchema = () => {
+    if (!selectedSchemaOption) return;
+    setSchemaText(JSON.stringify(selectedSchemaOption.schema, null, 2));
+    setSchemaInput('schema');
+    setSchemaError('');
+    setArtifact(null);
+  };
 
   const handleCopy = useCallback(async () => {
     if (typeof artifact?.content !== 'string') return;
@@ -140,6 +205,7 @@ export default function MockDataPanel({ notify, onSendToEditor }) {
   }, [artifact, onSendToEditor]);
 
   const validCount = Number.isInteger(count) && count >= 1 && count <= MAX_RECORDS;
+  const canGenerate = validCount && !generating && (schemaInput !== 'openapi' || Boolean(selectedSchemaOption));
   const isBinary = artifact && (artifact.format.id === 'parquet' || artifact.format.id === 'avro');
 
   return (
@@ -181,7 +247,7 @@ export default function MockDataPanel({ notify, onSendToEditor }) {
           type="button"
           className="btn btn-primary"
           onClick={handleGenerate}
-          disabled={!validCount || generating}
+          disabled={!canGenerate}
         >
           <Icon name="wand" size={14} /> {generating ? 'Generating…' : 'Generate payload'}
         </button>
@@ -191,7 +257,11 @@ export default function MockDataPanel({ notify, onSendToEditor }) {
         <section className="mock-data-schema">
           <div className="mock-data-input-head">
             <span className="diff-input-label">
-              {schemaInput === 'schema' ? 'JSON Schema' : 'Example JSON payload'}
+              {schemaInput === 'schema'
+                ? 'JSON Schema'
+                : schemaInput === 'payload'
+                  ? 'Example JSON payload'
+                  : 'OpenAPI specification'}
             </span>
             <div className="mock-data-input-actions">
               <div className="mock-data-input-modes" role="group" aria-label="Schema input mode">
@@ -211,11 +281,42 @@ export default function MockDataPanel({ notify, onSendToEditor }) {
                 >
                   Example JSON
                 </button>
+                <button
+                  type="button"
+                  className={schemaInput === 'openapi' ? 'chip is-on' : 'chip'}
+                  aria-pressed={schemaInput === 'openapi'}
+                  onClick={() => setSchemaInput('openapi')}
+                >
+                  OpenAPI
+                </button>
               </div>
               {schemaInput === 'payload' && (
                 <button type="button" className="mini-btn" onClick={handleInferSchema}>
                   <Icon name="wand" size={13} /> Infer schema
                 </button>
+              )}
+              {schemaInput === 'openapi' && (
+                <>
+                  <input
+                    ref={openApiFileRef}
+                    className="visually-hidden"
+                    type="file"
+                    accept=".json,.yaml,.yml,application/json,application/yaml,text/yaml"
+                    onChange={handleOpenApiFile}
+                    aria-label="Import OpenAPI file"
+                  />
+                  <button type="button" className="mini-btn" onClick={() => openApiFileRef.current?.click()}>
+                    <Icon name="upload" size={13} /> Import file
+                  </button>
+                  <button
+                    type="button"
+                    className="mini-btn"
+                    onClick={handleLoadOpenApi}
+                    disabled={!openApiText.trim() || loadingOpenApi}
+                  >
+                    <Icon name="schema" size={13} /> {loadingOpenApi ? 'Loading…' : 'Load endpoints'}
+                  </button>
+                </>
               )}
             </div>
           </div>
@@ -231,7 +332,7 @@ export default function MockDataPanel({ notify, onSendToEditor }) {
               spellCheck={false}
               aria-label="Payload JSON Schema"
             />
-          ) : (
+          ) : schemaInput === 'payload' ? (
             <textarea
               className="diff-textarea mock-data-schema-input"
               value={payloadText}
@@ -242,6 +343,61 @@ export default function MockDataPanel({ notify, onSendToEditor }) {
               spellCheck={false}
               aria-label="Example JSON payload"
             />
+          ) : (
+            <>
+              <textarea
+                className="diff-textarea mock-data-schema-input"
+                value={openApiText}
+                onChange={(event) => {
+                  setOpenApiText(event.target.value);
+                  setOpenApiDocument(null);
+                  setOperationId('');
+                  setSchemaOptionId('');
+                  setArtifact(null);
+                  setSchemaError('');
+                }}
+                spellCheck={false}
+                aria-label="OpenAPI specification"
+                placeholder="Paste an OpenAPI 3.x JSON or YAML document"
+              />
+              {openApiDocument && (
+                <div className="mock-data-openapi-selectors">
+                  <label className="mock-data-select-label">
+                    <span>Operation</span>
+                    <select aria-label="OpenAPI operation" value={operationId} onChange={handleOperationChange}>
+                      {openApiDocument.operations.map((operation) => (
+                        <option key={operation.id} value={operation.id}>{operation.label}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="mock-data-select-label">
+                    <span>Payload schema</span>
+                    <select
+                      aria-label="OpenAPI payload schema"
+                      value={schemaOptionId}
+                      onChange={(event) => {
+                        setSchemaOptionId(event.target.value);
+                        setArtifact(null);
+                      }}
+                    >
+                      {selectedOperation?.schemaOptions.map((option) => (
+                        <option key={option.id} value={option.id}>{option.label}</option>
+                      ))}
+                    </select>
+                  </label>
+                  {selectedOperation?.summary && <span className="panel-hint">{selectedOperation.summary}</span>}
+                  {selectedSchemaOption && (
+                    <details className="mock-data-openapi-schema">
+                      <summary>Selected schema</summary>
+                      <button type="button" className="mini-btn" onClick={handleEditOpenApiSchema}>
+                        Edit schema
+                      </button>
+                      <pre className="generator-output"><code>{JSON.stringify(selectedSchemaOption.schema, null, 2)}</code></pre>
+                    </details>
+                  )}
+                </div>
+              )}
+            </>
           )}
           {schemaError && <p className="mock-data-schema-error">{schemaError}</p>}
         </section>
