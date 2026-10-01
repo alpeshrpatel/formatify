@@ -290,6 +290,7 @@ export async function toParquetBuffer(value) {
   const columnData = keys.map((key) => ({
     name: key,
     data: rows.map((row) => coerceParquetValue(row[key])),
+    ...(rows.some((row) => row[key] !== null && typeof row[key] === 'object') ? { type: 'VARIANT' } : {}),
   }));
 
   return new Uint8Array(parquetWriteBuffer({ columnData, codec: 'UNCOMPRESSED' }));
@@ -299,7 +300,6 @@ function coerceParquetValue(value) {
   if (value === null || value === undefined) return null;
   if (value instanceof Date) return value.toISOString();
   if (typeof value === 'bigint') return Number(value);
-  if (typeof value === 'object' || Array.isArray(value)) return JSON.stringify(value);
   return value;
 }
 
@@ -355,11 +355,23 @@ function normalizeAvroValue(value) {
   if (value === null || value === undefined) return null;
   if (value instanceof Date) return value.toISOString();
   if (typeof value === 'bigint') return Number(value);
-  if (typeof value === 'object' || Array.isArray(value)) return JSON.stringify(value);
+  if (Array.isArray(value)) return value.map(normalizeAvroValue);
+  if (typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).map(([key, nested]) => [key, normalizeAvroValue(nested)]));
+  }
   return value;
 }
 
 function inferAvroSchema(rows) {
+  const state = { recordIndex: 0 };
+  return {
+    type: 'record',
+    name: 'Root',
+    fields: inferAvroFields(rows, state),
+  };
+}
+
+function inferAvroFields(rows, state) {
   const keys = [];
   const seen = new Set();
   for (const row of rows) {
@@ -373,35 +385,62 @@ function inferAvroSchema(rows) {
 
   const fields = keys.map((key) => ({
     name: key,
-    type: inferAvroFieldType(rows.map((row) => row[key])),
+    type: inferAvroFieldType(rows.map((row) => row[key]), key, state),
   }));
-
-  return { type: 'record', name: 'Root', fields };
+  return fields;
 }
 
-function inferAvroFieldType(values) {
+function inferAvroFieldType(values, fieldName, state) {
   const nonNull = values.filter((value) => value !== null && value !== undefined);
   if (nonNull.length === 0) return 'null';
 
-  const types = new Set(nonNull.map((value) => typeof value));
-  let type = 'string';
-  if (types.size === 1 && types.has('number')) {
-    type = nonNull.every((value) => Number.isInteger(value)) ? 'long' : 'double';
-  } else if (types.size === 1 && types.has('string')) {
-    type = 'string';
-  } else if (types.size === 1 && types.has('boolean')) {
-    type = 'boolean';
+  const categories = new Set(nonNull.map(avroCategory));
+  const branches = [];
+  for (const category of categories) {
+    const categoryValues = nonNull.filter((value) => avroCategory(value) === category);
+    if (category === 'number') {
+      branches.push(categoryValues.every(Number.isInteger) ? 'long' : 'double');
+    } else if (category === 'string' || category === 'boolean') {
+      branches.push(category);
+    } else if (category === 'array') {
+      const items = categoryValues.flat();
+      branches.push({
+        type: 'array',
+        items: inferAvroFieldType(items, `${fieldName}Item`, state),
+      });
+    } else {
+      const name = `Record${++state.recordIndex}`;
+      branches.push({ type: 'record', name, fields: inferAvroFields(categoryValues, state) });
+    }
   }
-  return values.some((value) => value === null || value === undefined) ? ['null', type] : type;
+  const schema = [...(values.some((value) => value === null || value === undefined) ? ['null'] : []), ...branches];
+  return schema.length === 1 ? schema[0] : schema;
+}
+
+function avroCategory(value) {
+  if (Array.isArray(value)) return 'array';
+  if (value !== null && typeof value === 'object') return 'record';
+  return typeof value;
 }
 
 function encodeAvroDatum(value, schema) {
   if (Array.isArray(schema)) {
-    const branchIndex = value === null || value === undefined ? 0 : 1;
+    const branchIndex = schema.findIndex((branch) => matchesAvroSchema(value, branch));
+    if (branchIndex === -1) throw new Error('Value does not match the inferred Avro schema.');
     return [...encodeAvroLong(branchIndex), ...encodeAvroDatum(value, schema[branchIndex])];
   }
-  if (typeof schema === 'object' && schema.type === 'record') {
-    return schema.fields.flatMap((field) => encodeAvroDatum(value?.[field.name] ?? null, field.type));
+  if (typeof schema === 'object') {
+    if (schema.type === 'record') {
+      return schema.fields.flatMap((field) => encodeAvroDatum(value?.[field.name] ?? null, field.type));
+    }
+    if (schema.type === 'array') {
+      if (value.length === 0) return encodeAvroLong(0);
+      return [
+        ...encodeAvroLong(value.length),
+        ...value.flatMap((item) => encodeAvroDatum(item, schema.items)),
+        ...encodeAvroLong(0),
+      ];
+    }
   }
 
   switch (schema) {
@@ -429,6 +468,18 @@ function encodeAvroDatum(value, schema) {
     default:
       throw new Error(`Unsupported Avro schema type: ${schema}`);
   }
+}
+
+function matchesAvroSchema(value, schema) {
+  if (schema === 'null') return value === null || value === undefined;
+  if (schema === 'string') return typeof value === 'string';
+  if (schema === 'boolean') return typeof value === 'boolean';
+  if (schema === 'long' || schema === 'double' || schema === 'float' || schema === 'int') {
+    return typeof value === 'number';
+  }
+  if (schema?.type === 'record') return value !== null && typeof value === 'object' && !Array.isArray(value);
+  if (schema?.type === 'array') return Array.isArray(value);
+  return false;
 }
 
 function encodeAvroLong(value) {

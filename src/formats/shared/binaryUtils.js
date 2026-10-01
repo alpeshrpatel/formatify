@@ -123,6 +123,29 @@ export function toJsonSafe(value) {
   return value;
 }
 
+/**
+ * Restore nested object/array strings written by older Formatify binary exporters.
+ * Ordinary strings and JSON scalar strings are left unchanged.
+ */
+export function restoreNestedJsonStrings(value) {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) return value;
+    try {
+      const parsed = JSON.parse(value);
+      if (parsed && typeof parsed === 'object') return restoreNestedJsonStrings(parsed);
+    } catch {
+      return value;
+    }
+    return value;
+  }
+  if (Array.isArray(value)) return value.map(restoreNestedJsonStrings);
+  if (value && typeof value === 'object' && !(value instanceof Date) && !(value instanceof Uint8Array)) {
+    return Object.fromEntries(Object.entries(value).map(([key, nested]) => [key, restoreNestedJsonStrings(nested)]));
+  }
+  return value;
+}
+
 /** Trigger a download of `content` (string or Blob parts). */
 export function downloadFile(filename, content, mime = 'application/octet-stream') {
   const blob = content instanceof Blob ? content : new Blob([content], { type: mime });

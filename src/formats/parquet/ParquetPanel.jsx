@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 import Icon from '../../components/Icon.jsx';
 import Toast from '../../components/Toast.jsx';
-import { downloadFile, readFileBytes, toJsonSafe } from '../shared/binaryUtils.js';
+import { downloadFile, readFileBytes, restoreNestedJsonStrings, toJsonSafe } from '../shared/binaryUtils.js';
 import DropZone from '../shared/DropZone.jsx';
 import { FileMetaChips, RowCountLabel } from '../shared/RecordsMeta.jsx';
 import RecordsTable from '../shared/RecordsTable.jsx';
@@ -153,13 +153,24 @@ export default function ParquetPanel({ notify: notifyProp, openRequest }) {
 
   const exportJson = useCallback(() => {
     if (rows.length === 0) return;
+    const json = JSON.stringify(toJsonSafe(restoreNestedJsonStrings(rows)), null, 2);
     downloadFile(
       fileName.replace(/\.parquet$/i, '') + '.preview.json',
-      JSON.stringify(toJsonSafe(rows), null, 2),
+      json,
       'application/json',
     );
     notify(`Exported ${rows.length} preview rows as JSON`, 'success');
   }, [rows, fileName, notify]);
+
+  const jsonOutput = JSON.stringify(toJsonSafe(restoreNestedJsonStrings(rows)), null, 2);
+  const copyJson = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(jsonOutput);
+      notify('Copied JSON preview to the clipboard', 'success');
+    } catch {
+      notify('The browser blocked clipboard access', 'error');
+    }
+  }, [jsonOutput, notify]);
 
   const truncated = meta ? rows.length < Number(meta.totalRows) : false;
 
@@ -207,7 +218,7 @@ export default function ParquetPanel({ notify: notifyProp, openRequest }) {
         <section className="panel">
           <header className="panel-head">
             <div className="tabs" role="tablist" aria-label="Parquet views">
-              {['rows', 'schema', 'groups'].map((id) => (
+              {['rows', 'json', 'schema', 'groups'].map((id) => (
                 <button
                   key={id}
                   type="button"
@@ -216,13 +227,10 @@ export default function ParquetPanel({ notify: notifyProp, openRequest }) {
                   className={tab === id ? 'tab is-active' : 'tab'}
                   onClick={() => setTab(id)}
                 >
-                  {id === 'rows' ? 'Rows' : id === 'schema' ? 'Schema' : 'Row groups'}
+                  {id === 'rows' ? 'Rows' : id === 'json' ? 'JSON' : id === 'schema' ? 'Schema' : 'Row groups'}
                 </button>
               ))}
             </div>
-            <button type="button" className="mini-btn" onClick={exportJson} disabled={rows.length === 0}>
-              <Icon name="download" size={13} /> JSON
-            </button>
           </header>
           {tab === 'rows' && (
             <div className="panel-body">
@@ -231,6 +239,31 @@ export default function ParquetPanel({ notify: notifyProp, openRequest }) {
                 <p className="empty-hint">Decoding the first rows…</p>
               ) : (
                 <RecordsTable rows={rows} totalRows={Number(meta.totalRows)} truncated={truncated} />
+              )}
+            </div>
+          )}
+          {tab === 'json' && (
+            <div className="panel-body json-preview">
+              <div className="json-preview-toolbar">
+                <span className="panel-hint">
+                  Pretty-printed preview: {rows.length.toLocaleString()} row{rows.length === 1 ? '' : 's'}
+                  {truncated && meta ? ` of ${Number(meta.totalRows).toLocaleString()}` : ''}
+                </span>
+                <div className="json-preview-actions">
+                  <button type="button" className="mini-btn" onClick={copyJson} disabled={rows.length === 0}>
+                    <Icon name="copy" size={13} /> Copy JSON
+                  </button>
+                  <button type="button" className="mini-btn" onClick={exportJson} disabled={rows.length === 0}>
+                    <Icon name="download" size={13} /> Download JSON
+                  </button>
+                </div>
+              </div>
+              {rows.length > 0 ? (
+                <pre className="json-preview-code" aria-label="Pretty-printed Parquet JSON preview">
+                  <code>{jsonOutput}</code>
+                </pre>
+              ) : (
+                <p className="empty-hint">No Parquet rows to convert.</p>
               )}
             </div>
           )}

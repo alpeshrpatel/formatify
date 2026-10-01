@@ -2,6 +2,7 @@ import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { readAvroPreview } from '../../avro/avroReader.js';
+import { readParquetPreview } from '../../parquet/parquetReader.js';
 import {
   fromCsv,
   fromXml,
@@ -18,31 +19,64 @@ import {
 /* -------------------------------------------------------------------------- */
 
 describe('toAvroBuffer', () => {
-  test('writes browser-safe OCF data that the Avro reader can decode', async () => {
+  test('preserves nested records and arrays in browser-safe OCF data', async () => {
     const bytes = await toAvroBuffer([
-      { id: 1, name: 'Ada', active: true, note: null, profile: { city: 'Paris' } },
-      { id: 2, name: 'Bob', active: false, note: 'hello' },
+      {
+        id: 1,
+        name: 'Ada',
+        active: true,
+        tags: ['one', 'two'],
+        profile: { city: 'Paris', rank: 1 },
+        orders: [{ sku: 'A-1', quantity: 2 }],
+      },
+      {
+        id: 2,
+        name: 'Bob',
+        active: false,
+        tags: [],
+        profile: { city: 'Rome', region: 'EU' },
+        orders: [],
+      },
     ]);
     assert.ok(bytes instanceof Uint8Array);
     assert.ok(bytes.length > 0);
     assert.deepEqual(bytes.subarray(0, 4), new Uint8Array([0x4f, 0x62, 0x6a, 0x01]));
     const decoded = await readAvroPreview(bytes);
     assert.deepEqual(decoded.records, [
-      { id: 1, name: 'Ada', active: true, note: null, profile: '{"city":"Paris"}' },
-      { id: 2, name: 'Bob', active: false, note: 'hello', profile: null },
+      {
+        id: 1,
+        name: 'Ada',
+        active: true,
+        tags: ['one', 'two'],
+        profile: { city: 'Paris', rank: 1, region: null },
+        orders: [{ sku: 'A-1', quantity: 2 }],
+      },
+      {
+        id: 2,
+        name: 'Bob',
+        active: false,
+        tags: [],
+        profile: { city: 'Rome', rank: null, region: 'EU' },
+        orders: [],
+      },
     ]);
   });
 });
 
 describe('toParquetBuffer', () => {
-  test('writes valid parquet bytes for a list of records', async () => {
+  test('preserves nested records and arrays for JSON export', async () => {
     const bytes = await toParquetBuffer([
-      { id: 1, name: 'Ada', active: true },
-      { id: 2, name: 'Bob', active: false },
+      { id: 1, profile: { name: 'Ada', active: true }, tags: ['one', 'two'], orders: [{ sku: 'A-1' }] },
+      { id: 2, profile: { name: 'Lin', active: false }, tags: [], orders: [] },
     ]);
     assert.ok(bytes instanceof Uint8Array);
     assert.ok(bytes.length > 0);
     assert.deepEqual(bytes.subarray(0, 4), new Uint8Array([0x50, 0x41, 0x52, 0x31]));
+    const rows = await readParquetPreview(bytes, { rowEnd: 2 });
+    assert.deepEqual(rows, [
+      { id: 1, profile: { name: 'Ada', active: true }, tags: ['one', 'two'], orders: [{ sku: 'A-1' }] },
+      { id: 2, profile: { name: 'Lin', active: false }, tags: [], orders: [] },
+    ]);
   });
 });
 

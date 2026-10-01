@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 import Icon from '../../components/Icon.jsx';
 import Toast from '../../components/Toast.jsx';
-import { downloadFile, readFileBytes, toJsonSafe } from '../shared/binaryUtils.js';
+import { downloadFile, readFileBytes, restoreNestedJsonStrings, toJsonSafe } from '../shared/binaryUtils.js';
 import DropZone from '../shared/DropZone.jsx';
 import { FileMetaChips, RowCountLabel } from '../shared/RecordsMeta.jsx';
 import RecordsTable from '../shared/RecordsTable.jsx';
@@ -104,13 +104,24 @@ export default function AvroPanel({ notify: notifyProp, openRequest }) {
 
   const exportJson = useCallback(() => {
     if (rows.length === 0) return;
+    const json = JSON.stringify(toJsonSafe(restoreNestedJsonStrings(rows)), null, 2);
     downloadFile(
       fileName.replace(/\.avro$/i, '') + '.preview.json',
-      JSON.stringify(toJsonSafe(rows), null, 2),
+      json,
       'application/json',
     );
     notify(`Exported ${rows.length} preview rows as JSON`, 'success');
   }, [rows, fileName, notify]);
+
+  const jsonOutput = JSON.stringify(toJsonSafe(restoreNestedJsonStrings(rows)), null, 2);
+  const copyJson = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(jsonOutput);
+      notify('Copied JSON preview to the clipboard', 'success');
+    } catch {
+      notify('The browser blocked clipboard access', 'error');
+    }
+  }, [jsonOutput, notify]);
 
   const schemaTree = header ? avroSchemaToTree(header.schema) : null;
   const blockRows = blocks.reduce((n, b) => n + (b.count ?? 0), 0);
@@ -156,7 +167,7 @@ export default function AvroPanel({ notify: notifyProp, openRequest }) {
         <section className="panel">
           <header className="panel-head">
             <div className="tabs" role="tablist" aria-label="Avro views">
-              {['rows', 'schema', 'blocks', 'meta'].map((id) => (
+              {['rows', 'json', 'schema', 'blocks', 'meta'].map((id) => (
                 <button
                   key={id}
                   type="button"
@@ -165,13 +176,18 @@ export default function AvroPanel({ notify: notifyProp, openRequest }) {
                   className={tab === id ? 'tab is-active' : 'tab'}
                   onClick={() => setTab(id)}
                 >
-                  {id === 'rows' ? 'Rows' : id === 'schema' ? 'Schema' : id === 'blocks' ? 'Blocks' : 'Metadata'}
+                  {id === 'rows'
+                    ? 'Rows'
+                    : id === 'json'
+                      ? 'JSON'
+                      : id === 'schema'
+                        ? 'Schema'
+                        : id === 'blocks'
+                          ? 'Blocks'
+                          : 'Metadata'}
                 </button>
               ))}
             </div>
-            <button type="button" className="mini-btn" onClick={exportJson} disabled={rows.length === 0}>
-              <Icon name="download" size={13} /> JSON
-            </button>
           </header>
           {tab === 'rows' && (
             <div className="panel-body">
@@ -179,6 +195,31 @@ export default function AvroPanel({ notify: notifyProp, openRequest }) {
                 <p className="empty-hint">Decoding the first records…</p>
               ) : (
                 <RecordsTable rows={rows} truncated={truncated} />
+              )}
+            </div>
+          )}
+          {tab === 'json' && (
+            <div className="panel-body json-preview">
+              <div className="json-preview-toolbar">
+                <span className="panel-hint">
+                  Pretty-printed preview: {rows.length.toLocaleString()} row{rows.length === 1 ? '' : 's'}
+                  {truncated && blockRows > rows.length ? ` of ${blockRows.toLocaleString()}` : ''}
+                </span>
+                <div className="json-preview-actions">
+                  <button type="button" className="mini-btn" onClick={copyJson} disabled={rows.length === 0}>
+                    <Icon name="copy" size={13} /> Copy JSON
+                  </button>
+                  <button type="button" className="mini-btn" onClick={exportJson} disabled={rows.length === 0}>
+                    <Icon name="download" size={13} /> Download JSON
+                  </button>
+                </div>
+              </div>
+              {rows.length > 0 ? (
+                <pre className="json-preview-code" aria-label="Pretty-printed Avro JSON preview">
+                  <code>{jsonOutput}</code>
+                </pre>
+              ) : (
+                <p className="empty-hint">No Avro records to convert.</p>
               )}
             </div>
           )}

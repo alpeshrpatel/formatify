@@ -473,6 +473,46 @@ button {
   gap: 14px;
 }
 
+.json-preview {
+  min-height: 0;
+}
+
+.json-preview-toolbar,
+.json-preview-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.json-preview-toolbar {
+  justify-content: space-between;
+}
+
+.json-preview-toolbar .panel-hint {
+  max-width: 100%;
+  white-space: normal;
+}
+
+.json-preview-code {
+  flex: 1 1 auto;
+  min-height: 180px;
+  max-height: 65vh;
+  margin: 0;
+  padding: 14px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--panel-2);
+  color: var(--text);
+  font: 12px/1.6 var(--font-mono);
+  white-space: pre;
+}
+
+.json-preview-code code {
+  font: inherit;
+}
+
 .tabs {
   display: inline-flex;
   gap: 4px;

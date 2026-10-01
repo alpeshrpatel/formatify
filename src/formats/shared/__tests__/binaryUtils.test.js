@@ -5,6 +5,7 @@ import {
   compareCells,
   formatBytes,
   inferColumnType,
+  restoreNestedJsonStrings,
   stringifyCell,
   toJsonSafe,
   truncateList,
@@ -62,6 +63,25 @@ describe('binaryUtils — toJsonSafe', () => {
     const input = { n: 1n, at: new Date(0), bytes: new Uint8Array([1, 2, 255]) };
     const safe = toJsonSafe(input);
     assert.deepEqual(safe, { n: '1', at: '1970-01-01T00:00:00.000Z', bytes: 'AQL/' });
+  });
+});
+
+describe('binaryUtils — restoreNestedJsonStrings', () => {
+  test('restores nested JSON objects and arrays but preserves ordinary strings', () => {
+    assert.deepEqual(
+      restoreNestedJsonStrings({
+        profile: '{"address":{"city":"Paris"}}',
+        tags: '["one","two"]',
+        text: 'not JSON',
+        scalar: 'true',
+      }),
+      {
+        profile: { address: { city: 'Paris' } },
+        tags: ['one', 'two'],
+        text: 'not JSON',
+        scalar: 'true',
+      },
+    );
   });
 });
 
