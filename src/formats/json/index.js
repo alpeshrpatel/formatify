@@ -24,7 +24,6 @@ export {
   toAvroBuffer,
 } from './jsonConvert.js';
 export { validateJsonSchema, inferSchema } from './jsonSchemaValidate.js';
-export { generatePayload } from './jsonDataGenerator.js';
 export { jsonPath } from './jsonPath.js';
 export { SAMPLES, DEFAULT_SAMPLE } from './samples.js';
 export { default as JsonPanel } from './JsonPanel.jsx';

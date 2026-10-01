@@ -116,7 +116,7 @@ export default function Toolbar({
           variant="btn-ghost"
           onClick={onClear}
           disabled={isEmpty}
-          title="Empty the editor"
+          title="Reset the editor to an empty object"
         />
       </div>
     </div>

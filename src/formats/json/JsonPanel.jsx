@@ -6,7 +6,6 @@ import ErrorPanel from './ErrorPanel.jsx';
 import JsonConvertPanel from './JsonConvertPanel.jsx';
 import JsonDiffPanel from './JsonDiffPanel.jsx';
 import JsonEditor from './JsonEditor.jsx';
-import JsonGeneratorPanel from './JsonGeneratorPanel.jsx';
 import JsonPathPanel from './JsonPathPanel.jsx';
 import JsonSchemaPanel from './JsonSchemaPanel.jsx';
 import JsonTree from './JsonTree.jsx';
@@ -35,7 +34,12 @@ function readSession() {
  * This used to be `App.jsx`; it is now a format panel so the Parquet and
  * Avro readers can live beside it.
  */
-export default function JsonPanel({ notify: notifyProp, openRequest }) {
+export default function JsonPanel({
+  notify: notifyProp,
+  openRequest,
+  generatedPayload,
+  onGeneratedPayloadConsumed,
+}) {
   const session = useMemo(readSession, []);
 
   const [text, setText] = useState(session.text ?? EMPTY_DOCUMENT);
@@ -153,6 +157,12 @@ export default function JsonPanel({ notify: notifyProp, openRequest }) {
     [notify],
   );
 
+  useEffect(() => {
+    if (!generatedPayload) return;
+    handleSendToEditor(generatedPayload.text, 'generated API payload');
+    onGeneratedPayloadConsumed?.(generatedPayload.id);
+  }, [generatedPayload, handleSendToEditor, onGeneratedPayloadConsumed]);
+
   const handleAutoFix = useCallback(() => {
     const repaired = repairJson(text);
     if (!repaired.changed) {
@@ -227,10 +237,10 @@ export default function JsonPanel({ notify: notifyProp, openRequest }) {
   }, [notify, sampleIndex]);
 
   const handleClear = useCallback(() => {
-    setText('');
+    setText(EMPTY_DOCUMENT);
     setFixNotes([]);
     setSourceLabel('untitled');
-    notify('Editor cleared', 'info');
+    notify('Editor reset to an empty object', 'info');
     editorRef.current?.focus();
   }, [notify]);
 
@@ -372,17 +382,6 @@ export default function JsonPanel({ notify: notifyProp, openRequest }) {
                 <Icon name="schema" size={14} />
                 Schema
               </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={tab === 'generate'}
-                className={tab === 'generate' ? 'tab is-active' : 'tab'}
-                onClick={() => setTab('generate')}
-                title="Generate API payloads from a JSON Schema"
-              >
-                <Icon name="wand" size={14} />
-                Generate
-              </button>
             </div>
             <span className="panel-hint">{formatSummary}</span>
             <label className="select-wrap view-menu" title="Choose a JSON view">
@@ -396,9 +395,6 @@ export default function JsonPanel({ notify: notifyProp, openRequest }) {
                   <option value="jsonpath">JSONPath</option>
                   <option value="diff">Diff Viewer</option>
                   <option value="schema">Schema validation</option>
-                </optgroup>
-                <optgroup label="Create & convert">
-                  <option value="generate">Generate API payload</option>
                 </optgroup>
                 <optgroup label="Convert">
                   <option value="convert">YAML / XML / CSV</option>
@@ -439,7 +435,7 @@ export default function JsonPanel({ notify: notifyProp, openRequest }) {
               onJump={goToError}
               onAutoFix={handleAutoFix}
             />
-          ) : !result.ok && tab !== 'diff' && tab !== 'generate' ? (
+          ) : !result.ok && tab !== 'diff' ? (
             <div className="panel-body">
               <p className="empty-hint">
                 This view needs valid JSON. Fix the reported problem first — or try the Diff tab.
@@ -461,8 +457,6 @@ export default function JsonPanel({ notify: notifyProp, openRequest }) {
               onSendToEditor={handleSendToEditor}
               notify={notify}
             />
-          ) : tab === 'generate' ? (
-            <JsonGeneratorPanel onSendToEditor={handleSendToEditor} notify={notify} />
           ) : (
             <JsonTree
               value={result.value}

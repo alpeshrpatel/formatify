@@ -1352,7 +1352,7 @@ button {
   min-width: 0;
 }
 
-/* Rounded track that visually groups the three format tabs */
+/* Rounded track that visually groups the workspace tabs */
 .tab-track {
   display: inline-flex;
   align-items: center;
@@ -1403,7 +1403,25 @@ button {
   box-shadow: 0 0 0 2px color-mix(in srgb, currentColor 18%, transparent);
 }
 
-/* Shortcut digit (1/2/3) painted via CSS so accessible text stays clean */
+@media (max-width: 640px) {
+  .format-switcher .tab-track {
+    width: 100%;
+    min-width: 0;
+    justify-content: space-around;
+    box-sizing: border-box;
+  }
+
+  .format-switcher .format-tab {
+    gap: 5px;
+    padding: 6px 7px;
+  }
+
+  .format-switcher .format-tab .tab-dot {
+    display: none;
+  }
+}
+
+/* Shortcut digit painted via CSS so accessible text stays clean */
 .format-tab::after {
   content: attr(data-key);
   padding: 1px 5px;
@@ -1977,7 +1995,7 @@ kbd {
 .diff-panel,
 .convert-panel,
 .schema-panel,
-.generator-panel {
+.mock-data-panel {
   flex: 1 1 auto;
   min-height: 0;
   display: flex;
@@ -2081,7 +2099,7 @@ kbd {
   min-height: 180px;
 }
 
-.generator-toolbar {
+.mock-data-toolbar {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -2112,20 +2130,20 @@ kbd {
   font-variant-numeric: tabular-nums;
 }
 
-.generator-toolbar .panel-hint {
+.mock-data-toolbar .panel-hint {
   margin-right: auto;
   max-width: none;
 }
 
-.generator-grid {
+.mock-data-grid {
   display: grid;
   grid-template-columns: minmax(240px, 0.9fr) minmax(0, 1.1fr);
   flex: 1 1 auto;
   min-height: 0;
 }
 
-.generator-schema,
-.generator-result {
+.mock-data-schema,
+.mock-data-result {
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -2134,11 +2152,31 @@ kbd {
   padding: 14px;
 }
 
-.generator-schema {
+.mock-data-schema {
   border-right: 1px solid var(--border);
 }
 
-.generator-schema-input,
+.mock-data-input-head,
+.mock-data-input-actions,
+.mock-data-input-modes {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.mock-data-input-head {
+  justify-content: space-between;
+}
+
+.mock-data-schema-error {
+  margin: 0;
+  color: var(--danger);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.mock-data-schema-input,
 .generator-output {
   flex: 1 1 auto;
   min-height: 280px;
@@ -2147,11 +2185,11 @@ kbd {
   overflow: auto;
 }
 
-.generator-schema-input {
+.mock-data-schema-input {
   resize: none;
 }
 
-.generator-result-head,
+.mock-data-result-head,
 .generator-actions {
   display: flex;
   align-items: center;
@@ -2159,8 +2197,18 @@ kbd {
   gap: 8px;
 }
 
-.generator-result-head {
+.mock-data-result-head {
   justify-content: space-between;
+}
+
+.mock-data-formats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.mock-data-summary {
+  max-width: 100%;
 }
 
 .generator-output {
@@ -2178,17 +2226,17 @@ kbd {
 }
 
 @media (max-width: 760px) {
-  .generator-grid {
+  .mock-data-grid {
     grid-template-columns: minmax(0, 1fr);
     overflow: auto;
   }
 
-  .generator-schema {
+  .mock-data-schema {
     border-right: 0;
     border-bottom: 1px solid var(--border);
   }
 
-  .generator-schema-input,
+  .mock-data-schema-input,
   .generator-output {
     min-height: 240px;
     max-height: 50vh;

@@ -70,13 +70,13 @@ describe('App — format switching', () => {
     document.documentElement.dataset.theme = 'dark';
   });
 
-  test('renders the three format tabs with JSON active by default', async () => {
+  test('renders the workspace tabs with JSON active by default', async () => {
     const app = await renderApp();
 
     const tabs = [...app.container.querySelectorAll('.format-tab')];
     assert.deepEqual(
       tabs.map((tab) => tab.textContent.trim()),
-      ['JSON', 'Parquet', 'Avro'],
+      ['JSON', 'Parquet', 'Avro', 'Mock Data'],
     );
     assert.ok(app.findFormatTab('JSON').className.includes('is-active'));
     assert.ok(app.textarea(), 'the JSON editor is mounted by default');
@@ -105,6 +105,18 @@ describe('App — format switching', () => {
 
     await app.click(app.findFormatTab('JSON'));
     assert.equal(app.textarea().value, '{"kept": true}', 'the JSON draft survives tab switches');
+
+    await app.unmount();
+  });
+
+  test('Mock Data is a separate workspace', async () => {
+    const app = await renderApp();
+
+    await app.click(app.findFormatTab('Mock Data'));
+
+    assert.ok(app.findFormatTab('Mock Data').className.includes('is-active'));
+    assert.ok(app.container.querySelector('.mock-data-panel'));
+    assert.equal(app.container.querySelector('[aria-label="JSON tools"] button[aria-selected="true"]'), null);
 
     await app.unmount();
   });
@@ -164,6 +176,19 @@ describe('App — file routing', () => {
     const fixed = app.textarea().value;
     assert.deepEqual(JSON.parse(fixed), { name: 'Ada', active: true });
     assert.match(app.text(), /Repaired the document/);
+
+    await app.unmount();
+  });
+
+  test('Clear resets the editor to a valid empty JSON object', async () => {
+    const app = await renderApp();
+    await app.type('{"temporary": true}');
+
+    await app.click(app.findButton('Clear'));
+
+    assert.equal(app.textarea().value, '{}');
+    assert.deepEqual(JSON.parse(app.textarea().value), {});
+    assert.match(app.text(), /Valid JSON/);
 
     await app.unmount();
   });

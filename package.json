@@ -8,7 +8,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node --import ./tools/register-jsx.mjs --test \"src/formats/*/__tests__/*.test.js\" src/components/__tests__/*.test.jsx",
+    "test": "node --import ./tools/register-jsx.mjs --test \"src/formats/*/__tests__/*.test.js\" \"src/mock-data/__tests__/*.test.js\" src/components/__tests__/*.test.jsx",
     "format:json": "node scripts/format-json.mjs"
   },
   "dependencies": {

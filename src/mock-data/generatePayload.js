@@ -1,3 +1,5 @@
+import { inferSchema } from '../formats/json/jsonSchemaValidate.js';
+
 /** Generate a list of values from a user-provided JSON Schema. */
 export async function generatePayload(schema, count, { seed = Date.now() + Math.floor(Math.random() * 1_000_000) } = {}) {
   if (!Number.isInteger(count) || count < 1 || count > 500) {
@@ -24,6 +26,11 @@ export async function generatePayload(schema, count, { seed = Date.now() + Math.
     }));
   }
   return records;
+}
+
+/** Parse a JSON example and infer a schema that describes its structure. */
+export function inferSchemaFromPayload(payloadText) {
+  return inferSchema(JSON.parse(payloadText));
 }
 
 function resolveFakerAnnotations(schema, faker) {

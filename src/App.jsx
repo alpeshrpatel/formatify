@@ -37,8 +37,7 @@ function initialFormatId(session) {
 
 /**
  * App shell: brand topbar, format switcher, global file opener, theme.
- * Each format owns its workspace under `src/formats/<id>/` and is
- * code-split — the JSON bundle stays lean until Parquet/Avro are opened.
+ * Workspaces are code-split; utility panels can live outside `src/formats`.
  */
 export default function App() {
   const [session] = useState(readSession);
@@ -46,6 +45,7 @@ export default function App() {
   const [theme, setTheme] = useState(session.theme ?? 'dark');
   const [toast, setToast] = useState(null);
   const [incomingFile, setIncomingFile] = useState(null);
+  const [generatedPayload, setGeneratedPayload] = useState(null);
   const [pageDragging, setPageDragging] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
 
@@ -72,6 +72,15 @@ export default function App() {
   }, [toast]);
 
   const switchFormat = useCallback((id) => setFormatId(getFormat(id).id), []);
+
+  const sendGeneratedPayloadToEditor = useCallback((text) => {
+    setGeneratedPayload({ id: Date.now() + Math.random(), text });
+    setFormatId('json');
+  }, []);
+
+  const clearGeneratedPayload = useCallback((id) => {
+    setGeneratedPayload((current) => current?.id === id ? null : current);
+  }, []);
 
   const toggleTheme = useCallback(
     () => setTheme((current) => (current === 'dark' ? 'light' : 'dark')),
@@ -118,7 +127,7 @@ export default function App() {
       const meta = event.metaKey || event.ctrlKey;
       const key = event.key;
 
-      if (meta && !event.altKey && ['1', '2', '3'].includes(key)) {
+      if (meta && !event.altKey && ['1', '2', '3', '4'].includes(key)) {
         event.preventDefault();
         switchFormat(FORMATS[Number(key) - 1].id);
         return;
@@ -282,7 +291,13 @@ export default function App() {
       </header>
 
       <Suspense fallback={<p className="empty-hint">Loading the {format.label} workspace…</p>}>
-        <Panel notify={notify} openRequest={incomingFile} />
+        <Panel
+          notify={notify}
+          openRequest={incomingFile}
+          generatedPayload={generatedPayload}
+          onGeneratedPayloadConsumed={clearGeneratedPayload}
+          onSendToEditor={sendGeneratedPayloadToEditor}
+        />
       </Suspense>
 
       <input

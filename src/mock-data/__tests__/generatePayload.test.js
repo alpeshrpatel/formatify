@@ -1,8 +1,8 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { generatePayload } from '../jsonDataGenerator.js';
-import { validateJsonSchema } from '../jsonSchemaValidate.js';
+import { generatePayload, inferSchemaFromPayload } from '../generatePayload.js';
+import { validateJsonSchema } from '../../formats/json/jsonSchemaValidate.js';
 
 const API_SCHEMA = {
   type: 'object',
@@ -50,5 +50,38 @@ describe('generatePayload', () => {
 
   test('requires a JSON Schema object', async () => {
     await assert.rejects(() => generatePayload([], 1), /schema must be a JSON Schema object/);
+  });
+});
+
+describe('inferSchemaFromPayload', () => {
+  test('infers nested object and array schemas from an example payload', () => {
+    const schema = inferSchemaFromPayload(JSON.stringify({
+      user: { id: 42, active: true },
+      orders: [{ sku: 'A-1', quantity: 2 }, { sku: 'B-2', quantity: 1 }],
+    }));
+
+    assert.deepEqual(schema, {
+      type: 'object',
+      properties: {
+        user: {
+          type: 'object',
+          properties: { id: { type: 'integer' }, active: { type: 'boolean' } },
+          required: ['id', 'active'],
+        },
+        orders: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: { sku: { type: 'string' }, quantity: { type: 'integer' } },
+            required: ['sku', 'quantity'],
+          },
+        },
+      },
+      required: ['user', 'orders'],
+    });
+  });
+
+  test('rejects invalid JSON payload text', () => {
+    assert.throws(() => inferSchemaFromPayload('{ invalid'), /JSON/);
   });
 });

@@ -59,6 +59,17 @@ describe('App — header shortcuts & deep links', () => {
     await app.unmount();
   });
 
+  test('Ctrl/⌘ + 4 switches to Mock Data', async () => {
+    const app = await renderApp();
+
+    await app.press({ key: '4', ctrlKey: true });
+
+    assert.ok(app.findFormatTab('Mock Data').className.includes('is-active'));
+    assert.ok(app.container.querySelector('.mock-data-panel'));
+
+    await app.unmount();
+  });
+
   test('the active tab is reflected in the URL and document title', async () => {
     const app = await renderApp();
     assert.equal(window.location.hash, '#json');

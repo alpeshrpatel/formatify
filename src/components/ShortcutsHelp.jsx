@@ -12,6 +12,7 @@ const GROUPS = [
       { keys: ['⌘/Ctrl', '1'], desc: 'Switch to the JSON workspace' },
       { keys: ['⌘/Ctrl', '2'], desc: 'Switch to the Parquet workspace' },
       { keys: ['⌘/Ctrl', '3'], desc: 'Switch to the Avro workspace' },
+      { keys: ['⌘/Ctrl', '4'], desc: 'Switch to the Mock Data workspace' },
       { keys: ['⌘/Ctrl', 'O'], desc: 'Open a file — the format is auto-detected' },
       { keys: ['⌘/Ctrl', '⇧', 'L'], desc: 'Toggle the dark / light theme' },
       { keys: ['?'], desc: 'Show or hide this shortcut guide' },

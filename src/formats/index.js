@@ -17,6 +17,7 @@
  *   - `Panel`        React component rendered when the format is active
  *   - `loadPanel()`  lazy importer for code-split panels (optional)
  *   - `detect(bytes)`  `(Uint8Array) => number` confidence in [0, 1]
+ *   - `utility`      true for workspaces that are not file formats
  */
 export const FORMATS = [
   {
@@ -52,6 +53,15 @@ export const FORMATS = [
     detect: (bytes) => detectAvro(bytes),
     loadPanel: () => import('./avro/AvroPanel.jsx'),
   },
+  {
+    id: 'mock-data',
+    label: 'Mock Data',
+    description: 'Generate API payloads from a JSON Schema in five formats.',
+    icon: 'wand',
+    hue: '#34d399',
+    utility: true,
+    loadPanel: () => import('../mock-data/MockDataPanel.jsx'),
+  },
 ];
 
 export const FORMAT_IDS = FORMATS.map((format) => format.id);
@@ -69,7 +79,7 @@ export function getFormat(id) {
  */
 export function detectFormat({ name = '', bytes = null } = {}) {
   const lower = String(name).toLowerCase();
-  const byExtension = FORMATS.find((format) =>
+  const byExtension = FORMATS.find((format) => !format.utility &&
     format.extensions.some((extension) => lower.endsWith(extension)),
   );
   if (byExtension) return byExtension.id;
@@ -78,6 +88,7 @@ export function detectFormat({ name = '', bytes = null } = {}) {
   let best = FORMATS[0];
   let bestScore = -1;
   for (const format of FORMATS) {
+    if (format.utility) continue;
     let score = 0;
     try {
       score = format.detect(bytes);
