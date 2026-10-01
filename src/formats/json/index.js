@@ -13,7 +13,16 @@ export {
 } from './jsonFormatter.js';
 export { repairJson } from './jsonRepair.js';
 export { diffLines, diffValues } from './jsonDiff.js';
-export { toYaml, fromYaml, toXml, fromXml, toCsv, fromCsv } from './jsonConvert.js';
+export {
+  toYaml,
+  fromYaml,
+  toXml,
+  fromXml,
+  toCsv,
+  fromCsv,
+  toParquetBuffer,
+  toAvroBuffer,
+} from './jsonConvert.js';
 export { validateJsonSchema, inferSchema } from './jsonSchemaValidate.js';
 export { jsonPath } from './jsonPath.js';
 export { SAMPLES, DEFAULT_SAMPLE } from './samples.js';

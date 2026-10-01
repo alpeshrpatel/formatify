@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import Icon from '../../components/Icon.jsx';
-import { fromCsv, fromXml, fromYaml, toCsv, toXml, toYaml } from './jsonConvert.js';
+import { downloadFile } from '../shared/binaryUtils.js';
+import { fromCsv, fromXml, fromYaml, toAvroBuffer, toCsv, toParquetBuffer, toXml, toYaml } from './jsonConvert.js';
 import { beautifyJson } from './jsonFormatter.js';
 import { validateJson } from './jsonParser.js';
 
@@ -94,6 +95,21 @@ export default function JsonConvertPanel({ data, onSendToEditor, notify }) {
     notify?.(`Downloaded as ${target.toUpperCase()}`, 'success');
   }, [output, target, notify]);
 
+  const handleBinaryDownload = useCallback(async (format) => {
+    if (!data && data !== null && data !== false && data !== 0 && data !== '') {
+      notify?.('Load a value before exporting to a binary format', 'error');
+      return;
+    }
+    try {
+      const bytes = format === 'parquet' ? await toParquetBuffer(data) : await toAvroBuffer(data);
+      const filename = `formatify.${format}`;
+      downloadFile(filename, bytes, format === 'parquet' ? 'application/parquet' : 'application/avro');
+      notify?.(`Downloaded as ${format.toUpperCase()}`, 'success');
+    } catch (err) {
+      notify?.(err instanceof Error ? err.message : 'Could not export that value as a binary file', 'error');
+    }
+  }, [data, notify]);
+
   const lineCount = useMemo(() => (output ? output.split('\n').length : 0), [output]);
 
 
@@ -137,6 +153,14 @@ export default function JsonConvertPanel({ data, onSendToEditor, notify }) {
               </button>
               <button type="button" className="btn btn-ghost" onClick={handleDownload}>
                 <Icon name="download" size={14} /> Download
+              </button>
+            </div>
+            <div className="convert-actions">
+              <button type="button" className="btn btn-ghost" onClick={() => handleBinaryDownload('parquet')}>
+                <Icon name="table" size={14} /> Export Parquet
+              </button>
+              <button type="button" className="btn btn-ghost" onClick={() => handleBinaryDownload('avro')}>
+                <Icon name="boxes" size={14} /> Export Avro
               </button>
             </div>
             <pre className="convert-output"><code>{output}</code></pre>

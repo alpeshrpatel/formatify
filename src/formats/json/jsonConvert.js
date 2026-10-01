@@ -4,6 +4,8 @@
      - JSON → YAML   (using the `yaml` library already in devDependencies)
      - JSON → XML    (hand-written, recursive)
      - JSON → CSV    (hand-written, flat array-of-objects only)
+     - JSON → Avro   (single record or array of records -> Avro OCF)
+     - JSON → Parquet (single record or array of records -> Parquet bytes)
      - YAML → JSON   (using `yaml`)
      - XML → JSON    (hand-written via DOMParser, browser only)
      - CSV → JSON    (hand-written, header row → object keys)
@@ -191,12 +193,19 @@ function parseCsvRow(row) {
   return fields;
 }
 
-/** Convert a flat array of objects to a CSV string. */
+/** Convert a JSON value to a CSV string.
+ *
+ * CSV is a tabular format, so we normalize any top-level value into a list of
+ * row objects before writing headers and values. A single object becomes one
+ * row, while arrays of objects remain unchanged.
+ */
 export function toCsv(value) {
-  if (!Array.isArray(value) || value.length === 0) return '';
+  const rows = normalizeCsvRows(value).map(flattenCsvRow);
+  if (rows.length === 0) return '';
+
   const headerSet = new Set();
   const headers = [];
-  for (const row of value) {
+  for (const row of rows) {
     for (const key of Object.keys(row)) {
       if (!headerSet.has(key)) {
         headerSet.add(key);
@@ -204,20 +213,242 @@ export function toCsv(value) {
       }
     }
   }
+
   const lines = [headers.map(escapeCsvField).join(',')];
-  for (const row of value) {
+  for (const row of rows) {
     lines.push(headers.map((key) => {
       const v = row[key];
       if (v === null || v === undefined) return '';
+      if (typeof v === 'object') return escapeCsvField(JSON.stringify(v));
       return escapeCsvField(String(v));
     }).join(','));
   }
   return lines.join('\n');
 }
 
+function normalizeCsvRows(value) {
+  if (value === null || value === undefined) return [];
+  if (Array.isArray(value)) {
+    if (value.length === 0) return [];
+    return value.map((item) => {
+      if (item !== null && typeof item === 'object' && !Array.isArray(item)) return item;
+      return { value: item };
+    });
+  }
+  if (typeof value === 'object') return [value];
+  return [{ value: value }];
+}
+
+function flattenCsvRow(row) {
+  return Object.entries(row ?? {}).reduce((flat, [key, value]) => {
+    Object.assign(flat, flattenCsvValue(value, key));
+    return flat;
+  }, {});
+}
+
+function flattenCsvValue(value, key) {
+  if (value === null || value === undefined) return { [key]: value };
+  if (Array.isArray(value)) {
+    if (value.length === 0) return { [key]: '' };
+    return value.reduce((flat, item, index) => {
+      Object.assign(flat, flattenCsvValue(item, `${key}.${index}`));
+      return flat;
+    }, {});
+  }
+  if (typeof value === 'object') {
+    if (Object.keys(value).length === 0) return { [key]: '' };
+    return Object.entries(value).reduce((flat, [nestedKey, nestedValue]) => {
+      Object.assign(flat, flattenCsvValue(nestedValue, `${key}.${nestedKey}`));
+      return flat;
+    }, {});
+  }
+  return { [key]: value };
+}
+
 function escapeCsvField(field) {
   if (/[",\n\r]/.test(field)) return '"' + field.replace(/"/g, '""') + '"';
   return field;
+}
+
+/** Serialize a JSON value to a Parquet file buffer. */
+export async function toParquetBuffer(value) {
+  const { parquetWriteBuffer } = await import('hyparquet-writer');
+  const rows = normalizeCsvRows(value);
+  if (rows.length === 0) return new Uint8Array();
+
+  const keyOrder = new Set();
+  const keys = [];
+  for (const row of rows) {
+    for (const key of Object.keys(row)) {
+      if (!keyOrder.has(key)) {
+        keyOrder.add(key);
+        keys.push(key);
+      }
+    }
+  }
+
+  const columnData = keys.map((key) => ({
+    name: key,
+    data: rows.map((row) => coerceParquetValue(row[key])),
+  }));
+
+  return new Uint8Array(parquetWriteBuffer({ columnData, codec: 'UNCOMPRESSED' }));
+}
+
+function coerceParquetValue(value) {
+  if (value === null || value === undefined) return null;
+  if (value instanceof Date) return value.toISOString();
+  if (typeof value === 'bigint') return Number(value);
+  if (typeof value === 'object' || Array.isArray(value)) return JSON.stringify(value);
+  return value;
+}
+
+/** Serialize a JSON object or array of objects to an Avro OCF buffer. */
+export async function toAvroBuffer(value) {
+  const rows = normalizeCsvRows(value).map(normalizeAvroRow);
+  if (rows.length === 0) return new Uint8Array();
+
+  const schema = inferAvroSchema(rows);
+  const syncMarker = new Uint8Array(16).fill(0x5a);
+  const payloadChunks = rows.map((row) => Uint8Array.from(encodeAvroDatum(row, schema)));
+  const payloadSize = payloadChunks.reduce((sum, bytes) => sum + bytes.length, 0);
+  const payload = new Uint8Array(payloadSize);
+  let offset = 0;
+  for (const bytes of payloadChunks) {
+    payload.set(bytes, offset);
+    offset += bytes.length;
+  }
+
+  const header = new Uint8Array([
+    0x4f, 0x62, 0x6a, 0x01,
+    ...encodeAvroLong(2n),
+    ...encodeAvroBytes(new TextEncoder().encode('avro.schema')),
+    ...encodeAvroBytes(new TextEncoder().encode(JSON.stringify(schema))),
+    ...encodeAvroBytes(new TextEncoder().encode('avro.codec')),
+    ...encodeAvroBytes(new TextEncoder().encode('null')),
+    ...encodeAvroLong(0n),
+    ...syncMarker,
+  ]);
+
+  const block = new Uint8Array([
+    ...encodeAvroLong(BigInt(rows.length)),
+    ...encodeAvroLong(BigInt(payload.length)),
+    ...payload,
+    ...syncMarker,
+  ]);
+
+  const out = new Uint8Array(header.length + block.length);
+  out.set(header, 0);
+  out.set(block, header.length);
+  return out;
+}
+
+function normalizeAvroRow(row) {
+  const out = {};
+  for (const [key, value] of Object.entries(row ?? {})) {
+    out[key] = normalizeAvroValue(value);
+  }
+  return out;
+}
+
+function normalizeAvroValue(value) {
+  if (value === null || value === undefined) return null;
+  if (value instanceof Date) return value.toISOString();
+  if (typeof value === 'bigint') return Number(value);
+  if (typeof value === 'object' || Array.isArray(value)) return JSON.stringify(value);
+  return value;
+}
+
+function inferAvroSchema(rows) {
+  const keys = [];
+  const seen = new Set();
+  for (const row of rows) {
+    for (const key of Object.keys(row)) {
+      if (!seen.has(key)) {
+        seen.add(key);
+        keys.push(key);
+      }
+    }
+  }
+
+  const fields = keys.map((key) => ({
+    name: key,
+    type: inferAvroFieldType(rows.map((row) => row[key])),
+  }));
+
+  return { type: 'record', name: 'Root', fields };
+}
+
+function inferAvroFieldType(values) {
+  const nonNull = values.filter((value) => value !== null && value !== undefined);
+  if (nonNull.length === 0) return 'null';
+
+  const types = new Set(nonNull.map((value) => typeof value));
+  let type = 'string';
+  if (types.size === 1 && types.has('number')) {
+    type = nonNull.every((value) => Number.isInteger(value)) ? 'long' : 'double';
+  } else if (types.size === 1 && types.has('string')) {
+    type = 'string';
+  } else if (types.size === 1 && types.has('boolean')) {
+    type = 'boolean';
+  }
+  return values.some((value) => value === null || value === undefined) ? ['null', type] : type;
+}
+
+function encodeAvroDatum(value, schema) {
+  if (Array.isArray(schema)) {
+    const branchIndex = value === null || value === undefined ? 0 : 1;
+    return [...encodeAvroLong(branchIndex), ...encodeAvroDatum(value, schema[branchIndex])];
+  }
+  if (typeof schema === 'object' && schema.type === 'record') {
+    return schema.fields.flatMap((field) => encodeAvroDatum(value?.[field.name] ?? null, field.type));
+  }
+
+  switch (schema) {
+    case 'null':
+      return [];
+    case 'boolean':
+      return [value ? 1 : 0];
+    case 'int':
+    case 'long':
+      return encodeAvroLong(value ?? 0);
+    case 'float': {
+      const bytes = new Uint8Array(4);
+      new DataView(bytes.buffer).setFloat32(0, Number(value), true);
+      return Array.from(bytes);
+    }
+    case 'double': {
+      const bytes = new Uint8Array(8);
+      new DataView(bytes.buffer).setFloat64(0, Number(value), true);
+      return Array.from(bytes);
+    }
+    case 'bytes':
+      return encodeAvroBytes(value instanceof Uint8Array ? value : new TextEncoder().encode(String(value ?? '')));
+    case 'string':
+      return encodeAvroBytes(new TextEncoder().encode(String(value ?? '')));
+    default:
+      throw new Error(`Unsupported Avro schema type: ${schema}`);
+  }
+}
+
+function encodeAvroLong(value) {
+  const n = BigInt(value);
+  let zigzag = (n << 1n) ^ (n >> 63n);
+  const out = [];
+  while (zigzag > 0x7fn) {
+    out.push(Number((zigzag & 0x7fn) | 0x80n));
+    zigzag >>= 7n;
+  }
+  out.push(Number(zigzag));
+  return out;
+}
+
+function encodeAvroBytes(bytes) {
+  const out = [];
+  const length = bytes.length;
+  out.push(...encodeAvroLong(length));
+  out.push(...Array.from(bytes));
+  return out;
 }
 
 /** Parse a YAML string into a JavaScript value. Uses the `yaml` package. */

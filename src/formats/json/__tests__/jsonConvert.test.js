@@ -1,19 +1,58 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { fromCsv, fromXml, fromYaml, toCsv, toXml, toYaml } from '../jsonConvert.js';
+import { readAvroPreview } from '../../avro/avroReader.js';
+import {
+  fromCsv,
+  fromXml,
+  fromYaml,
+  toAvroBuffer,
+  toCsv,
+  toParquetBuffer,
+  toXml,
+  toYaml,
+} from '../jsonConvert.js';
 
 /* -------------------------------------------------------------------------- */
 /* CSV                                                                         */
 /* -------------------------------------------------------------------------- */
+
+describe('toAvroBuffer', () => {
+  test('writes browser-safe OCF data that the Avro reader can decode', async () => {
+    const bytes = await toAvroBuffer([
+      { id: 1, name: 'Ada', active: true, note: null, profile: { city: 'Paris' } },
+      { id: 2, name: 'Bob', active: false, note: 'hello' },
+    ]);
+    assert.ok(bytes instanceof Uint8Array);
+    assert.ok(bytes.length > 0);
+    assert.deepEqual(bytes.subarray(0, 4), new Uint8Array([0x4f, 0x62, 0x6a, 0x01]));
+    const decoded = await readAvroPreview(bytes);
+    assert.deepEqual(decoded.records, [
+      { id: 1, name: 'Ada', active: true, note: null, profile: '{"city":"Paris"}' },
+      { id: 2, name: 'Bob', active: false, note: 'hello', profile: null },
+    ]);
+  });
+});
+
+describe('toParquetBuffer', () => {
+  test('writes valid parquet bytes for a list of records', async () => {
+    const bytes = await toParquetBuffer([
+      { id: 1, name: 'Ada', active: true },
+      { id: 2, name: 'Bob', active: false },
+    ]);
+    assert.ok(bytes instanceof Uint8Array);
+    assert.ok(bytes.length > 0);
+    assert.deepEqual(bytes.subarray(0, 4), new Uint8Array([0x50, 0x41, 0x52, 0x31]));
+  });
+});
 
 describe('toCsv', () => {
   test('writes a header row then one row per record', () => {
     assert.equal(toCsv([{ a: 1, b: 'x' }, { a: 2, b: 'y' }]), 'a,b\n1,x\n2,y');
   });
 
-  test('returns an empty string for a non-array', () => {
-    assert.equal(toCsv({ a: 1 }), '');
+  test('accepts a single object as a one-row CSV document', () => {
+    assert.equal(toCsv({ a: 1, b: 'x' }), 'a,b\n1,x');
     assert.equal(toCsv(null), '');
   });
 
@@ -43,6 +82,13 @@ describe('toCsv', () => {
 
   test('stringifies booleans and numbers', () => {
     assert.equal(toCsv([{ a: true, b: 1.5 }]), 'a,b\ntrue,1.5');
+  });
+
+  test('flattens nested objects into parent.child column names', () => {
+    assert.equal(
+      toCsv([{ user: { id: 1, name: 'Ada' }, active: true }]),
+      'user.id,user.name,active\n1,Ada,true',
+    );
   });
 });
 
