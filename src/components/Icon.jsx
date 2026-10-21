@@ -43,6 +43,8 @@ const ICONS = {
   moon: <path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z" />,
   chevronRight: <path d="M9 6l6 6-6 6" />,
   chevronDown: <path d="M6 9l6 6 6-6" />,
+  expandAll: <path d="M8 3H5a2 2 0 00-2 2v3m13-5h3a2 2 0 012 2v3M3 16v3a2 2 0 002 2h3m13-5v3a2 2 0 01-2 2h-3M8 8L3 3m13 5l5-5M8 16l-5 5m13-5l5 5" />,
+  collapseAll: <path d="M8 3v5H3m13-5v5h5M3 16h5v5m13-5h-5v5" />,
   search: (
     <>
       <circle cx="11" cy="11" r="7" />

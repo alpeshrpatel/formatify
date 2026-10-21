@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import Icon from '../../components/Icon.jsx';
 
@@ -40,9 +40,16 @@ function ScalarValue({ value, onCopy }) {
   );
 }
 
-function TreeNode({ label, value, depth, defaultOpen, onCopyValue, sortKeys, isRoot }) {
-  const [open, setOpen] = useState(defaultOpen ?? depth < 2);
+function TreeNode({ label, value, depth, defaultOpen, onCopyValue, sortKeys, isRoot, expandAll }) {
+  const [open, setOpen] = useState(expandAll || (defaultOpen ?? depth < 2));
+  const previousExpandAll = useRef(expandAll);
   const container = isContainer(value);
+
+  useEffect(() => {
+    if (previousExpandAll.current === expandAll) return;
+    previousExpandAll.current = expandAll;
+    setOpen(expandAll);
+  }, [expandAll]);
 
   const entries = useMemo(() => {
     if (!container) return [];
@@ -100,6 +107,7 @@ function TreeNode({ label, value, depth, defaultOpen, onCopyValue, sortKeys, isR
               depth={depth + 1}
               onCopyValue={onCopyValue}
               sortKeys={sortKeys}
+              expandAll={expandAll}
             />
           ))}
           {entries.length > shown.length && (
@@ -114,7 +122,7 @@ function TreeNode({ label, value, depth, defaultOpen, onCopyValue, sortKeys, isR
 }
 
 /** Collapsible explorer for a parsed JSON value. */
-export default function JsonTree({ value, onCopyValue, sortKeys }) {
+export default function JsonTree({ value, onCopyValue, sortKeys, expandAll = false }) {
   if (!isContainer(value)) {
     return (
       <div className="tree-scroll">
@@ -130,6 +138,7 @@ export default function JsonTree({ value, onCopyValue, sortKeys }) {
         defaultOpen
         onCopyValue={onCopyValue}
         sortKeys={sortKeys}
+        expandAll={expandAll}
         isRoot
       />
     </div>
