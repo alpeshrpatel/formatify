@@ -171,16 +171,52 @@ describe('App — file routing', () => {
     const app = await renderApp();
     await app.type('{"outer":{"inner":{"value":1}}}');
 
-    const tree = () => app.container.querySelector('.tree-scroll').textContent;
+    const tree = () => app.container.querySelector('.json-tree-view:not([hidden]) .tree-scroll')?.textContent ?? '';
     assert.ok(!tree().includes('value'), 'deep nodes start collapsed');
+    const jsonPathTab = [...app.container.querySelectorAll('[aria-label="JSON tools"] [role="tab"]')]
+      .find((tab) => tab.textContent.includes('JSONPath'));
+    await app.click(jsonPathTab);
+    assert.equal(
+      app.container.querySelector('[aria-label="JSON tools"] [aria-selected="true"]')?.textContent.trim(),
+      'JSONPath',
+    );
+
     const expandButton = app.container.querySelector('[aria-label="Expand all JSON nodes"]');
     assert.match(expandButton.textContent, /Expand/);
     await app.click(expandButton);
+    assert.equal(
+      app.container.querySelector('[aria-label="JSON tools"] [aria-selected="true"]')?.textContent.trim(),
+      'Tree',
+      'the expand action returns to the Tree view',
+    );
     assert.match(app.container.querySelector('[aria-label="Collapse all JSON nodes"]').textContent, /Collapse/);
     assert.ok(tree().includes('value'), 'deep nodes are visible after expanding');
 
+    const innerRow = [...app.container.querySelectorAll('.tree-key')]
+      .find((key) => key.textContent === 'inner')
+      .closest('.tree-row');
+    await app.click(innerRow.querySelector('.tree-toggle'));
+    assert.ok(!tree().includes('value'), 'a manually collapsed branch is hidden');
+
+    await app.click(jsonPathTab);
+    await app.click([...app.container.querySelectorAll('[aria-label="JSON tools"] [role="tab"]')]
+      .find((tab) => tab.textContent.trim() === 'Tree'));
+    assert.ok(!tree().includes('value'), 'the collapsed state survives a view switch');
+
+    const collapsedInnerRow = [...app.container.querySelectorAll('.tree-key')]
+      .find((key) => key.textContent === 'inner')
+      .closest('.tree-row');
+    await app.click(collapsedInnerRow.querySelector('.tree-toggle'));
+    assert.ok(tree().includes('value'), 'the branch can be expanded again');
+    await app.click(jsonPathTab);
+    await app.click([...app.container.querySelectorAll('[aria-label="JSON tools"] [role="tab"]')]
+      .find((tab) => tab.textContent.trim() === 'Tree'));
+    assert.ok(tree().includes('value'), 'the expanded state also survives a view switch');
+
     await app.click(app.container.querySelector('[aria-label="Collapse all JSON nodes"]'));
     assert.ok(!tree().includes('value'), 'deep nodes are hidden after collapsing');
+    await app.click(app.container.querySelector('[aria-label="Expand all JSON nodes"]'));
+    assert.ok(tree().includes('value'), 'a later expand click uses the fresh state');
 
     await app.unmount();
   });

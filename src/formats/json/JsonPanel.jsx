@@ -341,7 +341,10 @@ export default function JsonPanel({
                 className="tree-action"
                 aria-label={expandAll ? 'Collapse all JSON nodes' : 'Expand all JSON nodes'}
                 title={expandAll ? 'Collapse all' : 'Expand all'}
-                onClick={() => setExpandAll(!expandAll)}
+                onClick={() => {
+                  setTab('tree');
+                  setExpandAll((currentlyExpanded) => !currentlyExpanded);
+                }}
               >
                 <Icon name={expandAll ? 'collapseAll' : 'expandAll'} size={14} />
                 {expandAll ? 'Collapse' : 'Expand'}
@@ -469,12 +472,17 @@ export default function JsonPanel({
               notify={notify}
             />
           ) : (
-            <JsonTree
-              value={result.value}
-              sortKeys={sortKeys}
-              expandAll={expandAll}
-              onCopyValue={(value, type) => copyToClipboard(value, `${type} value`)}
-            />
+            null
+          )}
+          {result.ok && (
+            <div className="json-tree-view" hidden={tab !== 'tree'}>
+              <JsonTree
+                value={result.value}
+                sortKeys={sortKeys}
+                expandAll={expandAll}
+                onCopyValue={(value, type) => copyToClipboard(value, `${type} value`)}
+              />
+            </div>
           )}
         </section>
       </main>
