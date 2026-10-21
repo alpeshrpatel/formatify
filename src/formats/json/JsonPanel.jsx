@@ -48,6 +48,7 @@ export default function JsonPanel({
   const [tab, setTab] = useState(() =>
     validateJson(session.text ?? EMPTY_DOCUMENT).ok ? 'tree' : 'problems',
   );
+  const [expandAll, setExpandAll] = useState(false);
   const [toast, setToast] = useState(null);
   const [fixNotes, setFixNotes] = useState([]);
   const [sourceLabel, setSourceLabel] = useState('untitled');
@@ -337,6 +338,16 @@ export default function JsonPanel({
               </button>
               <button
                 type="button"
+                className="tree-action"
+                aria-label={expandAll ? 'Collapse all JSON nodes' : 'Expand all JSON nodes'}
+                title={expandAll ? 'Collapse all' : 'Expand all'}
+                onClick={() => setExpandAll(!expandAll)}
+              >
+                <Icon name={expandAll ? 'collapseAll' : 'expandAll'} size={14} />
+                {expandAll ? 'Collapse' : 'Expand'}
+              </button>
+              <button
+                type="button"
                 role="tab"
                 aria-selected={tab === 'jsonpath'}
                 className={tab === 'jsonpath' ? 'tab is-active' : 'tab'}
@@ -461,6 +472,7 @@ export default function JsonPanel({
             <JsonTree
               value={result.value}
               sortKeys={sortKeys}
+              expandAll={expandAll}
               onCopyValue={(value, type) => copyToClipboard(value, `${type} value`)}
             />
           )}

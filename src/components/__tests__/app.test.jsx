@@ -167,6 +167,24 @@ describe('App — file routing', () => {
     await app.unmount();
   });
 
+  test('the Tree action expands and collapses every JSON node', async () => {
+    const app = await renderApp();
+    await app.type('{"outer":{"inner":{"value":1}}}');
+
+    const tree = () => app.container.querySelector('.tree-scroll').textContent;
+    assert.ok(!tree().includes('value'), 'deep nodes start collapsed');
+    const expandButton = app.container.querySelector('[aria-label="Expand all JSON nodes"]');
+    assert.match(expandButton.textContent, /Expand/);
+    await app.click(expandButton);
+    assert.match(app.container.querySelector('[aria-label="Collapse all JSON nodes"]').textContent, /Collapse/);
+    assert.ok(tree().includes('value'), 'deep nodes are visible after expanding');
+
+    await app.click(app.container.querySelector('[aria-label="Collapse all JSON nodes"]'));
+    assert.ok(!tree().includes('value'), 'deep nodes are hidden after collapsing');
+
+    await app.unmount();
+  });
+
   test('auto-fix still repairs the document from the shell', async () => {
     const app = await renderApp();
     await app.type('{ name: ‘Ada’, active: True, }');
